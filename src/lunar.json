@@ -1,0 +1,54 @@
+{
+  "x": 1508,
+  "y": 320,
+  "frames": [
+    {
+      "filename": "sp_illum.0060.jpg",
+      "sample": 136,
+      "frame": 60,
+      "time": "2026-01-05T22:00:00Z"
+    },
+    {
+      "filename": "sp_illum.0061.jpg",
+      "sample": 70,
+      "frame": 61,
+      "time": "2026-01-06T00:00:00Z"
+    },
+    {
+      "filename": "sp_illum.0062.jpg",
+      "sample": 0,
+      "frame": 62,
+      "time": "2026-01-06T02:00:00Z"
+    },
+    {
+      "filename": "sp_illum.0063.jpg",
+      "sample": 0,
+      "frame": 63,
+      "time": "2026-01-06T04:00:00Z"
+    },
+    {
+      "filename": "sp_illum.0064.jpg",
+      "sample": 0,
+      "frame": 64,
+      "time": "2026-01-06T06:00:00Z"
+    },
+    {
+      "filename": "sp_illum.0065.jpg",
+      "sample": 47,
+      "frame": 65,
+      "time": "2026-01-06T08:00:00Z"
+    },
+    {
+      "filename": "sp_illum.0066.jpg",
+      "sample": 63,
+      "frame": 66,
+      "time": "2026-01-06T10:00:00Z"
+    }
+  ],
+  "crop": {
+    "y": 179,
+    "x": 438,
+    "height": 578,
+    "width": 1182
+  }
+}

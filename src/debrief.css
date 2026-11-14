@@ -1,0 +1,32 @@
+.debrief { display: grid; gap: 13px; margin-top: 16px; }
+.debrief > section { background: #141f34; border: 1px solid #354760; padding: 17px; border-radius: 12px; }
+.debrief h2 { font-size: clamp(19px,3vw,25px); font-weight: 850; letter-spacing: -.03em; margin-bottom: 9px; }
+.debrief h3 { font-size: 16px; font-weight: 800; margin-bottom: 9px; }
+.debrief p { color: #bdcce6; font-size: 13px; line-height: 1.45; }
+.debrief-readings { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+.debrief-readings > div { display: grid; gap: 4px; min-width: 0; border: 1px solid #34475f; background: #101a2c; border-radius: 8px; padding: 8px; }
+.debrief-readings span { font-size: 11px; color: #cbd8ec; }
+.debrief-readings strong { color: var(--reading); font-size: 21px; }
+.debrief-readings small { color: #a4b4d0; font-size: 10px; }
+.debrief-meter { height: 5px; border-radius: 5px; background: #2f4058; overflow: hidden; }
+.debrief-meter i { display: block; height: 100%; background: var(--reading); }
+.debrief-summary-line, .timeline-change { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.debrief-summary-line span, .timeline-change span { border: 1px solid #42516d; border-radius: 6px; padding: 4px 7px; color: #dce6f8; font-size: 11px; }
+.turn-tabs { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 6px; }
+.turn-tabs button { min-height: 38px; border: 1px solid #465e7c; background: #1f2d48; border-radius: 6px; font-size: 13px; font-weight: 750; color: #d6ddfb; }
+.turn-tabs button.lit-turn { color: #f6d492; background: #302c35; }
+.turn-tabs button:disabled { opacity: .45; cursor: default; }
+.turn-tabs button[aria-pressed=true] { border-color: var(--mint); background: #23423f; color: var(--mint); }
+.timeline-entry { margin-top: 10px; }
+.timeline-entry p { margin-top: 4px; }
+.debrief-replay label { margin-top: 13px; display: flex; justify-content: space-between; color: #edf9f8; font-size: 13px; }
+.debrief-replay input { width: 100%; accent-color: var(--mint); margin: 8px 0; }
+.replay-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 5px 0 9px; }
+.replay-comparison > div { background: #192a43; padding: 10px; border: 1px solid #425875; border-radius: 8px; min-width: 0; }
+.replay-comparison .debrief-readings { grid-template-columns: repeat(2,1fr); }
+.replay-comparison p { margin-top: 7px; }
+@media (max-width: 540px) {
+  .debrief > section { padding: 12px; }
+  .debrief-readings { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .replay-comparison { grid-template-columns: 1fr; }
+}

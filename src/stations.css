@@ -1,0 +1,39 @@
+.power-bus { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.power-bus > div { display: grid; align-content: center; gap: 3px; border: 1px solid #385769; background: #112c3c; border-radius: 8px; padding: 8px; font-size: 11px; color: #bdd1e4; }
+.power-bus strong { font-size: 16px; color: #effbf6; }
+.energy-cell { grid-column: 1 / -1; min-height: 35px; color: var(--amber); cursor: grab; }
+.power-load { display: grid; gap: 7px; background: #142338; border: 1px solid #496c7e; border-radius: 8px; padding: 9px; }
+.power-load label { display: flex; justify-content: space-between; color: #e8fff2; font-size: 13px; font-weight: 750; }
+.power-load input { width: 100%; accent-color: var(--mint); min-height: 26px; }
+.power-load small { color: #c5dfdc; font-size: 11px; }
+.load-dots { display: flex; gap: 4px; }
+.load-dots > i { flex: 1; height: 5px; background: #293b52; border-radius: 3px; }
+.load-dots > .lit { background: var(--mint); box-shadow: 0 0 6px #a4f1ce70; }
+.refill-air { padding: 9px; text-align: left; }
+.station-warning { font-size: 12px; color: #ffdaa2; }
+.workstation button:disabled { opacity: .52; cursor: default; transform: none; box-shadow: none; }
+.route-puzzle { min-height: 160px; touch-action: pan-y; }
+.route-puzzle .waypoint { min-height: 37px; white-space: nowrap; }
+.route-lines line { stroke: #8a95b9; stroke-width: 1.7px; stroke-dasharray: 4px 4px; vector-effect: non-scaling-stroke; }
+.route-lines .rough-road { stroke: #d8a66b; }
+.route-lines .traced { stroke: var(--mint); stroke-width: 3px; stroke-dasharray: none; }
+.route-cost, .packet-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.route-cost span { border: 1px solid #425471; border-radius: 6px; padding: 4px 6px; color: #dce9f9; font-size: 11px; }
+.shield-board { display: grid; gap: 7px; background: #181e38; border: 1px solid #515981; border-radius: 8px; padding: 8px; text-align: center; }
+.particle-front { color: var(--lilac); font-size: 18px; letter-spacing: .24em; }
+.shield-gaps { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.shield-gap { border-style: dashed; min-height: 47px; }
+.shield-gap[aria-pressed=true] { border-style: solid; color: var(--mint); }
+.shield-crew { font-size: 11px; color: #dde4fb; }
+.shield-crew span { color: var(--blue); margin-right: 6px; }
+.pod-supply, .packet-chips button { min-height: 37px; padding: 5px 8px; }
+.packet-board { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+.packet-board span { background: #152337; border: 1px dashed #546f88; color: #becfe3; font-size: 11px; padding: 7px 5px; border-radius: 7px; }
+.packet-board .filled { color: var(--mint); background: #173d3d; border-color: var(--mint); border-style: solid; }
+.packet-board strong { display: block; margin-top: 3px; }
+.radio-journey { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; margin-top: 9px; color: #c3e7fc; }
+.radio-journey i { display: inline-block; height: 6px; width: 6px; border-radius: 100%; background: #95dfff; margin-right: 3px; animation: earth-receive 2.56s both; }
+@keyframes earth-receive { 0%, 49% { opacity: .3; } 50%, 100% { opacity: 1; } }
+@media (max-width: 390px) {
+  .route-puzzle .waypoint { font-size: 10px; padding-inline: 4px; }
+}
