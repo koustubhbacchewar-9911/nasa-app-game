@@ -7,8 +7,8 @@ export const samplePoint = { x: (lunar.x - lunar.crop.x) / lunar.crop.width * 10
 export const crew = {
   mira: { name: 'Mira', role: 'Power engineer', line: 'Keeps the solar panels and air machine running.', color: '#f9ca81' },
   jo: { name: 'Dr. Jo', role: 'Plant scientist', line: 'Grows the crew’s first Moon salad.', color: '#aee8b3' },
-  ren: { name: 'Ren', role: 'Radio operator', line: 'Sends messages between the Moon and Earth.', color: '#a9dffc' },
-  pip: { name: 'Pip', role: 'Rover pilot', line: 'Drives the rover and spots problems outside.', color: '#f0bcff' },
+  ren: { name: 'Ren', role: 'Radio operator', line: 'Sends messages between the Moon and Earth.', color: '#becba5' },
+  pip: { name: 'Pip', role: 'Rover pilot', line: 'Drives the rover and spots problems outside.', color: '#ffb37e' },
 }
 
 export type CrewId = keyof typeof crew
@@ -42,8 +42,8 @@ type Turn = {
 }
 export const chapters: { name: string; summary: string; icon: IconName; color: string; object: string }[] = [
   { name: 'When the lights go out', summary: 'Share the battery between air and the garden.', icon: 'sun', color: 'amber', object: 'Solar array' },
-  { name: 'Storm at the ridge', summary: 'Use the shelter while particles from the Sun pass by.', icon: 'storm', color: 'lilac', object: 'Shielded shelter' },
-  { name: 'Earth, do you copy?', summary: 'Send a message and bring the base back online.', icon: 'radio', color: 'blue', object: 'Earth antenna' },
+  { name: 'Storm at the ridge', summary: 'Use the shelter while particles from the Sun pass by.', icon: 'storm', color: 'coral', object: 'Shielded shelter' },
+  { name: 'Earth, do you copy?', summary: 'Send a message and bring the base back online.', icon: 'radio', color: 'sage', object: 'Earth antenna' },
 ]
 
 export const turns: Turn[] = [

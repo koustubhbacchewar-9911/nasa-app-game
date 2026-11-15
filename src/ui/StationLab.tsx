@@ -35,7 +35,7 @@ function Greenhouse({ state, next, bed, selectBed }: { state: Colony; next: Colo
             <strong>Lettuce {index * 3 + offset + 1}</strong>
             <small>{ready ? 'Ready' : plant.health < 3 ? 'Stressed' : 'Growing'}</small>
             <Gauge label="Health" value={plant.health} max={plantLimit} color="mint" />
-            <Gauge label="Growth" value={plant.growth} max={plantLimit} color="blue" />
+            <Gauge label="Growth" value={plant.growth} max={plantLimit} color="sage" />
             {(forecast.health !== plant.health || forecast.growth !== plant.growth) && <p className="plant-forecast">
               Preview · {forecast.health}/{plantLimit} health · {forecast.growth}/{plantLimit} growth
             </p>}
@@ -93,7 +93,7 @@ function StationReadout({ state, after, site, choice, settings, setBearing }: {
     const signal = choice?.transmit ? signalStrength(choice, settings) : 0
     return <div className="lab-diagram">
       <div className="lab-summary"><Icon name="radio" /><b>{signal >= 82 ? 'Earth signal locked' : 'Sweep for Earth'}</b></div>
-      <Gauge label="Signal strength" color="blue" value={signal} max={100} />
+      <Gauge label="Signal strength" color="sage" value={signal} max={100} />
       {choice?.transmit && <><label htmlFor="lab-bearing">Antenna angle · {bearing}°</label>
         <input id="lab-bearing" type="range" min="0" max="100" value={bearing} onChange={(event) => setBearing(Number(event.currentTarget.value))} />
         <button className="station-button" onClick={() => setBearing(72)}>Auto-align dish</button></>}
@@ -103,7 +103,7 @@ function StationReadout({ state, after, site, choice, settings, setBearing }: {
   if (site === 'air') return <div className="lab-diagram">
     <div className="lab-summary"><Icon name="air" /><b>Backup oxygen tanks</b></div>
     <div className="oxygen-cells" aria-hidden="true">{Array.from({ length: capacity.oxygen }, (_, i) => <i key={i} data-fill={i < state.oxygen} data-preview={i < after.oxygen} />)}</div>
-    <Gauge label="Projected reserve" color="blue" value={after.oxygen} max={capacity.oxygen} />
+    <Gauge label="Projected reserve" color="sage" value={after.oxygen} max={capacity.oxygen} />
   </div>
   if (site === 'kit') return <div className="lab-diagram">
     <div className="lab-summary"><Icon name={choice?.id === 'walk' ? 'radio' : 'target'} /><b>{choice?.id === 'walk' ? 'Relay kit pickup' : 'Surface sample'}</b></div>

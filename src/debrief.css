@@ -19,7 +19,7 @@
 }
 .debrief-summary-line { display: grid; gap: .6rem; padding: .95rem 0 0; margin: .95rem 0 0; border-top: 1px solid var(--line); list-style: none; }
 .debrief-summary-line li { display: flex; align-items: center; gap: .5rem; font-size: .86rem; color: var(--muted-strong); }
-.debrief-summary-line svg { color: var(--blue); }
+.debrief-summary-line svg { color: var(--sage); }
 
 .turn-tabs {
   display: grid;
@@ -36,13 +36,13 @@
   padding: .32rem .25rem;
   border: 1px solid var(--line-strong);
   border-radius: .5rem;
-  background: #1c2733;
+  background: #2b261f;
   font: 600 .82rem var(--mono);
   transition: border-color var(--response) var(--ease), background-color var(--response) var(--ease);
 }
-.turn-tabs button:hover:not(:disabled) { border-color: var(--blue); }
-.turn-tabs button[aria-pressed="true"] { border-color: var(--blue); background: #28414f; }
-.turn-tabs button svg { color: var(--blue); }
+.turn-tabs button:hover:not(:disabled) { border-color: var(--sage); }
+.turn-tabs button[aria-pressed="true"] { border-color: var(--sage); background: #443d33; }
+.turn-tabs button svg { color: var(--sage); }
 .turn-tabs .lit-turn svg { color: var(--amber); }
 .timeline-entry {
   display: grid;
@@ -80,7 +80,7 @@
   background: #ffffff08;
   padding: .85rem;
 }
-.replay-comparison > div:last-child { border-color: #a6dcfa72; background: #a6dcfa0b; }
+.replay-comparison > div:last-child { border-color: #becba572; background: #becba50b; }
 .replay-comparison p { margin-top: .8rem; }
 .replay-comparison p strong { color: var(--moon); }
 

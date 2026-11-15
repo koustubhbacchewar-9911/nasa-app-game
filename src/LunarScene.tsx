@@ -8,6 +8,11 @@ import { landingSites } from './colony'
 import { Icon } from './ui/Icon'
 import './world/world.css'
 
+const markerColors: Record<SiteId, string> = {
+  power: 'var(--amber)', garden: 'var(--mint)', rover: '#dcab80', kit: 'var(--coral)',
+  shelter: 'var(--sage)', radio: '#eae1cd', air: '#c0b682', lander: '#b5b2a8',
+}
+
 type SceneProps = {
   state: WorldState
   demo?: boolean
@@ -102,26 +107,26 @@ export function LunarScene({ state, demo = false, onInteract, onOverview, onUnav
         <span style={{ transform: 'rotate(' + bearing + 'rad)' }}><Icon name="down" size={22} /></span>
         <strong>{objective.name}</strong><small>{distance} m</small>
       </div>}
-      <div className="world-map" role="img" aria-label={flight ? 'Landing sites map. Selected landing site: ' + landingName : 'Outpost map. ' + objective.name + ' is ' + distance + ' meters away.'} style={{ '--objective': objective.color } as CSSProperties}>
+      <div className="world-map" role="img" aria-label={flight ? 'Landing sites map. Selected landing site: ' + landingName : 'Outpost map. ' + objective.name + ' is ' + distance + ' meters away.'} style={{ '--objective': markerColors[state.site] } as CSSProperties}>
         <span className="map-north">N</span>
         {expedition && Object.entries(sectors).map(([id, site]) => <i key={id} title={landingSites[id as keyof typeof sectors].name} aria-hidden="true"
           className={'map-site map-landing' + (id === expedition.sector ? ' map-selected' : '')}
-          style={{ left: (50 + site.x * 1.88) + '%', top: (50 + site.z * 1.88) + '%', background: site.color }} />)}
+          style={{ left: (50 + site.x * 1.88) + '%', top: (50 + site.z * 1.88) + '%', background: id === 'ridge' ? 'var(--amber)' : 'var(--sage)' }} />)}
         {expedition && <i title={habitat.name} aria-hidden="true" className="map-site"
-          style={{ left: (50 + habitat.x * 1.88) + '%', top: (50 + habitat.z * 1.88) + '%', background: habitat.color }} />}
+          style={{ left: (50 + habitat.x * 1.88) + '%', top: (50 + habitat.z * 1.88) + '%', background: 'var(--mint)' }} />}
         {focus && <i title="Selected installation mount" aria-hidden="true" className="map-site map-landing map-selected"
-          style={{ left: (50 + focus.x * 1.88) + '%', top: (50 + focus.z * 1.88) + '%', background: objective.color }} />}
+          style={{ left: (50 + focus.x * 1.88) + '%', top: (50 + focus.z * 1.88) + '%', background: markerColors[state.site] }} />}
         {!flight && expedition?.layout.map((slot, index) => {
           if (slot == null) return null
           const mount = moduleMount(index, slot)
           const station = mapSites[moduleSites[index]]
           return <i key={station.name} title={station.name + ' equipment'} aria-hidden="true" className="map-site map-landing"
-            style={{ left: (50 + mount.x * 1.88) + '%', top: (50 + mount.z * 1.88) + '%', background: station.color }} />
+            style={{ left: (50 + mount.x * 1.88) + '%', top: (50 + mount.z * 1.88) + '%', background: markerColors[moduleSites[index]] }} />
         })}
         {!flight && Object.entries(mapSites).filter(([id]) => {
           const module = moduleSites.findIndex((module) => module === id)
           return !expedition || module < 0 || expedition.layout[module] != null || expedition.pending?.part === module
-        }).map(([id, site]) => <i key={id} title={site.name} aria-hidden="true" className={id === state.site ? 'map-site map-current' : 'map-site'} style={{ left: (50 + site.x * 1.88) + '%', top: (50 + site.z * 1.88) + '%', background: site.color }} />)}
+        }).map(([id, site]) => <i key={id} title={site.name} aria-hidden="true" className={id === state.site ? 'map-site map-current' : 'map-site'} style={{ left: (50 + site.x * 1.88) + '%', top: (50 + site.z * 1.88) + '%', background: markerColors[id as SiteId] }} />)}
         {!flight && <i className="map-player" aria-hidden="true" style={{ left: (50 + location.x * 1.88) + '%', top: (50 + location.z * 1.88) + '%', rotate: location.angle + 'rad' }} />}
       </div>
       {!state.locked && <div className="world-interact">

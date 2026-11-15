@@ -22,7 +22,7 @@ export function MissionProgress({ turn, demo }: { turn: number; demo: boolean })
 
 export const resourceReadings = [
   { key: 'power', name: 'Battery', icon: 'battery', color: 'amber' },
-  { key: 'air', name: 'Backup air', icon: 'air', color: 'blue' },
+  { key: 'air', name: 'Backup air', icon: 'air', color: 'sage' },
   { key: 'garden', name: 'Crop progress', icon: 'plant', color: 'mint' },
   { key: 'exposure', name: 'Exposure', icon: 'shield', color: 'coral' },
 ] as const
@@ -42,7 +42,7 @@ export function MissionMeters({ mission, turn, frameIndex }: { mission: Mission;
   const frame = frames[frameIndex]
   const resources = turns[turn].solarAlert ? resourceReadings : resourceReadings.slice(0, 3)
   return <section className="telemetry glass-panel" aria-label="Outpost resources">
-    <div className={'solar-status ' + (frame.sunlit ? 'amber' : 'blue')}>
+    <div className={'solar-status ' + (frame.sunlit ? 'amber' : 'sage')}>
       <Icon name={frame.sunlit ? 'sun' : 'moon'} size={21} />
       <div><strong>{frame.sunlit ? 'Sunlit panels' : 'Panels in shadow'}</strong><small>+{frame.sunlit ? solarPower : 0} power · Air uses {airCost}</small></div>
     </div>

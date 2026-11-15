@@ -289,7 +289,7 @@ function App() {
       </section>}
 
       {page === 'report' && <section className="report-wrap content-width" aria-labelledby="report-title">
-        <header className={'report-splash ' + (passed ? 'mint' : demo ? 'blue' : 'amber')}>
+        <header className={'report-splash ' + (passed ? 'mint' : demo ? 'sage' : 'amber')}>
           <span className="report-icon"><Icon name={demo ? 'rewind' : passed ? 'check' : 'shield'} size={29} /></span>
           <p className="eyebrow">{demo ? 'Judge demo · Decision replay' : 'Farpoint flight log'}</p>
           <h1 id="report-title" ref={focusHeading} tabIndex={-1}>{demo ? 'One shadow, different outcomes' : passed ? 'The crew made it to handover' : 'Farpoint called off the shift'}</h1>

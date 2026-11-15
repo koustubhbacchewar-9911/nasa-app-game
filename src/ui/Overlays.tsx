@@ -37,7 +37,7 @@ function Evidence({ index }: { index: number }) {
         aria-valuetext={'Frame ' + frame.frame + ', ' + condition + ', ' + time}
         onChange={(event) => setFrameIndex(Number(event.target.value))} />
     </div>
-    <div className={'evidence-reading ' + (frame.sunlit ? 'amber' : 'blue')}>
+    <div className={'evidence-reading ' + (frame.sunlit ? 'amber' : 'sage')}>
       <Icon name={frame.sunlit ? 'sun' : 'moon'} size={24} />
       <div><strong>{condition} · +{frame.sunlit ? solarPower : 0} power in the game</strong><p>{time}. The model advances two Earth hours per frame.</p></div>
     </div>

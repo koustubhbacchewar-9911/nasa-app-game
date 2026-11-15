@@ -5,7 +5,7 @@ export const sites: Record<SiteId, { name: string; x: number; z: number; color: 
   garden: { name: 'Greenhouse', x: 8, z: 0, color: '#9af9cb' },
   rover: { name: 'Pip’s rover', x: 10, z: 9, color: '#ffc88c' },
   kit: { name: 'Repair kit', x: 18, z: 1, color: '#ffb683' },
-  shelter: { name: 'Shielded shelter', x: -10, z: -11, color: '#c7b1ff' },
+  shelter: { name: 'Shielded shelter', x: -10, z: -11, color: '#92e4d2' },
   radio: { name: 'Earth antenna', x: 9, z: -15, color: '#a0dfff' },
   air: { name: 'Air plant', x: -1, z: -7, color: '#a5e5fc' },
   lander: { name: 'Landing pad', x: -16, z: 13, color: '#b1c0ee' },

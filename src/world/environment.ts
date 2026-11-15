@@ -92,7 +92,7 @@ export function terrain(scene: T.Scene, expedition = false) {
   }
   base.setAttribute('color', new T.Float32BufferAttribute(colors, 3))
   base.computeVertexNormals()
-  const surface = mesh(scene, base, new T.MeshStandardMaterial({ vertexColors: true, color: '#d4d5eb', map: mineralTexture(), roughness: 1 }), 0, 0, 0)
+  const surface = mesh(scene, base, new T.MeshStandardMaterial({ vertexColors: true, color: '#d9e0e2', map: mineralTexture(), roughness: 1 }), 0, 0, 0)
   surface.castShadow = false
   if (!expedition) track(scene, spawn, { x: 0, z: 1 })
   if (!expedition) for (const id of ['power', 'garden', 'air', 'rover', 'shelter', 'radio', 'lander'] as const) {
@@ -100,7 +100,7 @@ export function terrain(scene: T.Scene, expedition = false) {
     const hub = id === 'lander' || id === 'rover' ? spawn : { x: 0, z: -1 }
     track(scene, hub, site)
   }
-  const rocks = new T.InstancedMesh(new T.DodecahedronGeometry(1, 0), metal('#75717e', .99), 240)
+  const rocks = new T.InstancedMesh(new T.DodecahedronGeometry(1, 0), metal('#777e80', .99), 240)
   const dummy = new T.Object3D()
   for (let i = 0; i < rocks.count; i++) {
     const angle = random() * Math.PI * 2
@@ -166,7 +166,7 @@ export function sky(scene: T.Scene) {
   const sun = sphere(scene, 3.4, new T.MeshBasicMaterial({ color: '#fff2c1', fog: false }), -47, 11, -88, 24)
   sun.castShadow = false
   const storm = new T.Group()
-  const streaks = new T.InstancedMesh(new T.BoxGeometry(.024, 1.2, .026), new T.MeshBasicMaterial({ color: '#dfb3ff', transparent: true, opacity: .48, fog: false }), 96)
+  const streaks = new T.InstancedMesh(new T.BoxGeometry(.024, 1.2, .026), new T.MeshBasicMaterial({ color: '#ffd087', transparent: true, opacity: .48, fog: false }), 96)
   const ray = new T.Object3D()
   for (let i = 0; i < streaks.count; i++) {
     ray.position.set(random() * 68 - 34, 1 + random() * 13, random() * 68 - 34)

@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import { briefings, capacity, choose, colonyFrame, harvestCount, installationCost, landingSites, modules, options, setupPower, startColony, sunlight, tuneChoice } from '../colony'
 import type { Colony, LandingSite, Layout, Reading, StationChoice } from '../colony'
 import { radio, storm } from '../science'
-import { moduleSites, sectors, sites } from '../world/layout'
+import { moduleSites, sites } from '../world/layout'
 import type { SiteId } from '../world/layout'
 import type { ShelterPhase, WorkVisual, WorldState } from '../world/runtime'
 import photo from '../art/apollo-11.webp'
@@ -42,7 +42,7 @@ function workFor(state: Colony, draft: Draft): WorkVisual {
 
 const readings = [
   { key: 'power', label: 'Battery', unit: 'stored power', icon: 'battery', color: 'amber' },
-  { key: 'oxygen', label: 'Oxygen', unit: 'backup air', icon: 'air', color: 'blue' },
+  { key: 'oxygen', label: 'Oxygen', unit: 'backup air', icon: 'air', color: 'sage' },
   { key: 'food', label: 'Food', unit: 'one meal per watch', icon: 'food', color: 'mint' },
   { key: 'exposure', label: 'Exposure', unit: 'lower is safer', icon: 'shield', color: 'coral' },
 ] as const
@@ -367,7 +367,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
               <button className="world-button placement-return" onClick={() => station.current?.scrollIntoView({ block: 'nearest' })}>Station controls</button>
             </div>}
           </div>
-          <div key={String(frame.sunlit)} className={'world-light-note ' + (frame.sunlit ? 'amber' : 'blue')}>
+          <div key={String(frame.sunlit)} className={'world-light-note ' + (frame.sunlit ? 'amber' : 'sage')}>
             <Icon name={frame.sunlit ? 'sun' : 'moon'} size={19} /><strong>{frameLabel}</strong>
             <a href="https://svs.gsfc.nasa.gov/4930/" target="_blank" rel="noreferrer">NASA model · Frame {frame.frame}</a>
           </div>
@@ -391,7 +391,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
               {(Object.entries(landingSites) as [LandingSite, typeof landingSites[LandingSite]][]).map(([id, item]) =>
                 <button className="decision-card" key={id} aria-pressed={site === id} onClick={() => { setSite(id); cue(true) }}>
                   <Icon name={id === 'ridge' ? 'sun' : 'shield'} /><strong>{item.name}</strong>
-                  <span><span className="site-swatch" style={{ background: sectors[id].color }} /> {id === 'ridge' ? 'Northwest ridge' : 'Southeast crater'}</span>
+                  <span><span className="site-swatch" style={{ background: id === 'ridge' ? 'var(--amber)' : 'var(--sage)' }} /> {id === 'ridge' ? 'Northwest ridge' : 'Southeast crater'}</span>
                   <span>{item.description}</span>
                   <small>{item.power} starting battery</small>
                 </button>)}

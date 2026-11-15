@@ -19,7 +19,7 @@ function Projection({ mission, plan }: { mission: Mission; plan: Plan }) {
     <span className="eyebrow">After this job</span>
     <div className="projected-resources">
       <span className="amber"><strong>{next.power}</strong> Battery</span>
-      <span className="blue"><strong>{next.air}</strong> Backup air</span>
+      <span className="sage"><strong>{next.air}</strong> Backup air</span>
       <span className="mint"><strong>{next.garden}</strong> Crop steps</span>
     </div>
     {shade > 0 && <small>{shade} turns of shadow ahead. Stored power covers {airTurns} {airTurns === 1 ? 'turn' : 'turns'} of air.</small>}

@@ -37,7 +37,7 @@ type Callbacks = { onNear: (value: SiteId | null) => void; onUse: (site: SiteId)
 type MoveInput = { x: number; y: number }
 
 const keyControls = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyQ', 'KeyR'])
-const crewColors = { mira: '#9d79d0', jo: '#7fbd91', ren: '#7794d3', pip: '#e4b15c' }
+const crewColors = { mira: '#e6ac61', jo: '#7fbd91', ren: '#7794d3', pip: '#e4b15c' }
 const roverWaypoints = { kit: new T.Vector3(17.3, 0, 1.35), shelter: new T.Vector3(-7.35, 0, -10.5), ridge: new T.Vector3(17, 0, 10) }
 const cameraTarget = new T.Vector3()
 const up = new T.Vector3(0, 1, 0)
@@ -159,8 +159,8 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
   directional.shadow.normalBias = .06
   directional.shadow.bias = -.00022
   scene.add(directional, directional.target)
-  const ambient = new T.HemisphereLight('#bacdff', '#8c8198', 1.37)
-  const fill = new T.DirectionalLight('#a7b7ff', .66)
+  const ambient = new T.HemisphereLight('#c0dbe8', '#8a8a80', 1.37)
+  const fill = new T.DirectionalLight('#a7ceec', .66)
   fill.position.set(9, 11, 13)
   scene.add(ambient, fill)
   const campaign = !!initial.expedition

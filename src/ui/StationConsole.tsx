@@ -36,7 +36,7 @@ export function StationConsole({
   </div>
 
   if (sending) return <div className="task-feedback" role="status">
-    <span className="chapter-icon blue"><Icon name="radio" size={23} /></span>
+    <span className="chapter-icon sage"><Icon name="radio" size={23} /></span>
     <h2>Waiting for Earth…</h2>
     <p>1.28 seconds there and 1.28 seconds back.</p>
     <div className="radio-journey" aria-hidden="true"><span>Farpoint</span><span>Earth</span><span>Farpoint</span></div>
@@ -68,7 +68,7 @@ export function StationConsole({
   </div>
 
   return <div className="station-context">
-    <span className="chapter-icon blue"><Icon name="target" size={24} /></span>
+    <span className="chapter-icon sage"><Icon name="target" size={24} /></span>
     <p className="eyebrow">Current objective</p>
     <h2>{sites[site].name}</h2>
     <p>Follow the marker in the outpost. When you’re close, tap <strong>Operate</strong> or press <kbd>E</kbd>.</p>
