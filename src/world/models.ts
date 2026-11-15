@@ -93,6 +93,7 @@ function shelterShell(group: T.Group) {
   cylinder(group, 1.55, 2.35, .55, navy, 0, 3.47, 0, 10)
   box(group, 2.55, 2.41, .75, navy, 0, 1.36, 2.19)
   box(group, 1.74, 1.98, .13, gray, 0, 1.2, 2.6)
+  box(group, 1.47, 1.75, .025, rubber, 0, 1.14, 2.664)
   const hatch = box(group, 1.42, 1.69, .12, metal('#495470'), 0, 1.14, 2.68)
   const ring = mesh(group, new T.TorusGeometry(.37, .055, 8, 18), purple, 0, 1.17, 2.77)
   ring.castShadow = false

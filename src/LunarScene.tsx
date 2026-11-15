@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent } from 'react'
 import { createWorld } from './world/runtime'
-import type { WorldState } from './world/runtime'
+import type { ShelterPhase, WorldState } from './world/runtime'
 import { expeditionSites, habitat, moduleMount, moduleSites, sectors, sites, spawn } from './world/layout'
 import type { SiteId } from './world/layout'
 import { landingSites } from './colony'
@@ -16,13 +16,14 @@ type SceneProps = {
   onUnavailable?: () => void
   onRoverArrived?: () => void
   onTouchdown?: () => void
+  onShelterPhase?: (phase: ShelterPhase) => void
 }
 
-export function LunarScene({ state, demo = false, onInteract, onOverview, onUnavailable, onRoverArrived, onTouchdown }: SceneProps) {
+export function LunarScene({ state, demo = false, onInteract, onOverview, onUnavailable, onRoverArrived, onTouchdown, onShelterPhase }: SceneProps) {
   const host = useRef<HTMLDivElement>(null)
   const controller = useRef<ReturnType<typeof createWorld> | null>(null)
-  const latest = useRef({ state, onInteract, onUnavailable, onRoverArrived, onTouchdown })
-  latest.current = { state, onInteract, onUnavailable, onRoverArrived, onTouchdown }
+  const latest = useRef({ state, onInteract, onUnavailable, onRoverArrived, onTouchdown, onShelterPhase })
+  latest.current = { state, onInteract, onUnavailable, onRoverArrived, onTouchdown, onShelterPhase }
   const [near, setNear] = useState<SiteId | null>(null)
   const [location, setLocation] = useState({ ...spawn, angle: 0, cameraYaw: 0 })
   const [error, setError] = useState(false)
@@ -44,6 +45,7 @@ export function LunarScene({ state, demo = false, onInteract, onOverview, onUnav
         onUnavailable: unavailable,
         onRoverArrived: () => latest.current.onRoverArrived?.(),
         onTouchdown: () => latest.current.onTouchdown?.(),
+        onShelterPhase: (phase) => latest.current.onShelterPhase?.(phase),
       }, demo)
     } catch (error) {
       console.error('Could not start the lunar scene', error)

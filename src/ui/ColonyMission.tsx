@@ -1,16 +1,16 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { briefings, capacity, choose, colonyFrame, harvestCount, landingSites, modules, options, startColony, sunlight } from '../colony'
-import type { Colony, LandingSite, Layout, Reading } from '../colony'
+import { briefings, capacity, choose, colonyFrame, harvestCount, installationCost, landingSites, modules, options, setupPower, startColony, sunlight, tuneChoice } from '../colony'
+import type { Colony, LandingSite, Layout, Reading, StationChoice } from '../colony'
 import { radio, storm } from '../science'
 import { moduleSites, sectors, sites } from '../world/layout'
 import type { SiteId } from '../world/layout'
-import type { WorkVisual, WorldState } from '../world/runtime'
+import type { ShelterPhase, WorkVisual, WorldState } from '../world/runtime'
 import photo from '../art/apollo-11.webp'
 import { Icon } from './Icon'
 import { asset, Avatar } from './Shared'
 import { StationLab } from './StationLab'
-import type { Draft, StationChoice } from './StationLab'
+import type { Draft } from './StationLab'
 import './colony.css'
 
 const LunarScene = lazy(() => import('../LunarScene').then((module) => ({ default: module.LunarScene })))
@@ -29,19 +29,24 @@ const visuals: Record<string, WorkVisual> = {
 }
 const completedIds: Record<string, string> = { reserve: 'store', pods: 'shield', 'one-pod': 'shield' }
 
-function workFor(draft: Draft): WorkVisual {
-  const { choice, bearing } = draft
+function workFor(state: Colony, draft: Draft): WorkVisual {
+  const choice = tuneChoice(state, draft.choice, draft.settings)
   if (choice.greenhouse) return { light: choice.greenhouse.light, pulse: choice.greenhouse.water ? 'oxygen' : undefined }
-  if (choice.transmit) return { bearing }
+  if (choice.harvest) return { light: 0, pulse: 'power' }
+  if (choice.transmit) return { bearing: draft.settings.bearing }
+  if (choice.id === 'pods') return { pods: draft.settings.level ?? 2 }
+  if (choice.id === 'refill') return { pulse: 'oxygen' }
+  if (visuals[choice.id]?.roverStops) return { ...visuals[choice.id], roverPower: choice.cost }
   return visuals[choice.id] ?? {}
 }
 
 const readings = [
   { key: 'power', label: 'Battery', unit: 'stored power', icon: 'battery', color: 'amber' },
   { key: 'oxygen', label: 'Oxygen', unit: 'backup air', icon: 'air', color: 'blue' },
+  { key: 'food', label: 'Food', unit: 'one meal per watch', icon: 'food', color: 'mint' },
   { key: 'exposure', label: 'Exposure', unit: 'lower is safer', icon: 'shield', color: 'coral' },
 ] as const
-type Job = { id: string; title: string; site: SiteId; next: Colony; work: WorkVisual; greenhouse: boolean; transmit?: boolean }
+type Job = { id: string; title: string; site: SiteId; next: Colony; work: WorkVisual; draft?: Draft; transmit?: boolean }
 type Activity = { label: string; work: WorkVisual; sending: boolean }
 type Placements = [boolean | null, boolean | null, boolean | null]
 const signed = (value: number) => value > 0 ? '+' + value : value < 0 ? '−' + Math.abs(value) : '0'
@@ -83,12 +88,13 @@ function Consequences({ before, after }: { before: Colony; after: Colony }) {
 }
 
 function FlightLog({ state, onRetry }: { state: Colony; onRetry: () => void }) {
-  const unsafe = state.oxygen === 0 || state.exposure >= capacity.exposure
+  const unsafe = state.oxygen === 0 || state.exposure >= capacity.exposure || state.missedMeal
   return <>
     <h2>{unsafe ? 'Mission Control called the crew inside' : state.log.at(-1)?.title === 'End the shift early' ? 'The crew ended the shift early' : 'Shift complete'}</h2>
     <ul className="goal-list">
       <li><Icon name="air" />{state.oxygen ? state.oxygen + ' oxygen ready for the next crew' : 'Oxygen reserve exhausted'}</li>
       <li><Icon name="shield" />{state.exposure < capacity.exposure ? 'Crew below the exposure limit' : 'Exposure limit reached'}</li>
+      <li><Icon name="food" />{state.missedMeal ? 'Food ran out before the crew could eat' : `${state.food} food left for the next watch`}</li>
       <li><Icon name="plant" />{harvestCount(state)} of {state.plants.length} lettuce plants ready to harvest</li>
       <li><Icon name="radio" />{state.contact ? 'Earth received your message' : 'Earth is still waiting for an update'}</li>
       <li><Icon name="target" />{state.research ? 'Rock sample collected' : state.scanned ? 'Surface scan recorded' : 'Rock sample left on the surface'}</li>
@@ -115,7 +121,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
   const [hoverMount, setHoverMount] = useState<boolean | null>(null)
   const [pendingMount, setPendingMount] = useState<boolean | null>(null)
   const [occupied, setOccupied] = useState(false)
-  const [sheltered, setSheltered] = useState(false)
+  const [shelterPhase, setShelterPhase] = useState<ShelterPhase | null>(null)
   const [kit, setKit] = useState(false)
   const [overview, setOverview] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
@@ -125,30 +131,38 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
   const world = useRef<HTMLDivElement>(null)
   const station = useRef<HTMLDivElement>(null)
   const lastSite = useRef<SiteId>('lander')
+  const alerted = useRef(false)
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
   const displayed = feedback ?? state
   const seed = startColony(site, layout.map(Boolean) as Layout)
+  const setupBalance = setupPower(site, layout)
   const frame = colonyFrame(state ?? seed)
-  const stormActive = state?.node === 'warning' || state?.node === 'shelter' || state?.node === 'relay'
+  const stormWatch = state?.node === 'warning' || state?.node === 'shelter' || state?.node === 'relay'
+  const incoming = displayed?.node === 'warning' && !shelterPhase
+  const stormActive = incoming || shelterPhase === 'approach' || shelterPhase === 'inside'
+  const stormStatus = shelterPhase ?? (feedback && stormWatch ? 'clear' : incoming ? 'incoming' : null)
   const report = state?.node === 'report'
   const module = modules[part]
   const objective = queued?.site ?? (state ? (report ? lastSite.current : decisionSites[state.node]) : stage === 'build' ? moduleSites[part] : 'lander')
   const previewMount = stage === 'build' && occupied && !activity && !setupResult ? hoverMount ?? mount : null
   const routeOptions = state ? options(state) : []
-  const stationOptions: StationChoice[] = queued
-    ? routeOptions.filter((choice) => queued.greenhouse ? !!choice.greenhouse : choice.id === queued.id)
-    : routeOptions.filter((choice) => !choice.greenhouse || choice.id === 'grow')
+  const earlyShelter = !occupied && !queued && !unavailable && routeOptions.find((choice) => choice.id === 'hide')
+  const stationOptions: StationChoice[] = routeOptions.filter((choice) => {
+    if (queued && objective !== 'garden') return choice.id === queued.id
+    if (objective === 'garden') return choice.id === 'grow' || choice.harvest
+    return (!choice.greenhouse || choice.id === 'grow') && choice.id !== 'one-pod' && choice.id !== 'top-up'
+  })
   const title = stage === 'site' ? 'Choose where to land' : stage === 'landing' ? 'Descending to ' + landingSites[site].name
     : stage === 'build' ? 'Build Farpoint' : state ? briefings[state.node].title : 'The Moon, up close'
   const sceneState: WorldState = {
-    site: inspecting ?? (feedback ? lastSite.current : objective), turn: state?.watch ?? -1,
+    site: inspecting ?? (activity?.work.shelterRun ? 'shelter' : feedback ? lastSite.current : objective), turn: state?.watch ?? -1,
     light: frame.sunlit, storm: stormActive, crew: 'pip',
     work: activity?.work ?? (feedback && finishedJob && !finishedJob.work.roverStops ? finishedJob.work : draftWork),
     opened: occupied || !!inspecting, locked: stage === 'site' || stage === 'landing' || occupied || !!inspecting || !!activity || !!report || paused,
-    completed: feedback && finishedJob ? finishedJob.greenhouse ? 'garden' : completedIds[finishedJob.id] : undefined,
+    completed: feedback && finishedJob ? finishedJob.draft?.choice.greenhouse || finishedJob.id === 'harvest' ? 'garden' : completedIds[finishedJob.id] : undefined,
     kit, garden: displayed?.crop ?? 0, sending: !!activity?.sending, overview,
-    expedition: { sector: site, recon: stage === 'site', descent: stage === 'landing', layout, sheltered,
+    expedition: { sector: site, recon: stage === 'site', descent: stage === 'landing', layout,
       sampleCollected: !!displayed?.research, plants: (displayed ?? seed).plants,
       pending: pendingMount === null ? undefined : { part, outer: pendingMount },
       preview: previewMount === null ? undefined : { part, outer: previewMount },
@@ -164,7 +178,12 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
       : 'Follow the marker to the mount. Press E or tap Build when you get there.'
     : report ? 'Let’s check what the next crew will inherit.'
     : occupied && state ? briefings[state.node].prompt
-    : 'Follow the arrow to the ' + sites[objective].name.toLowerCase() + ', then press E or tap Operate.';
+    : 'Follow the ground arrows to the ' + sites[objective].name.toLowerCase() + ', then press E or tap Operate.';
+
+  useEffect(() => {
+    if (incoming && !alerted.current) cue(false)
+    alerted.current = incoming
+  }, [incoming, cue])
 
   function viewport() {
     if (window.matchMedia('(max-width: 760px)').matches) world.current?.scrollIntoView({ block: 'start' })
@@ -186,34 +205,42 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
     viewport()
     finishWork.current = callback
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    timer.current = window.setTimeout(complete, !activity.sending && !activity.work.roverStops && reduced ? Math.min(duration, 450) : duration)
+    timer.current = window.setTimeout(complete, !activity.sending && !activity.work.roverStops && !activity.work.shelterRun && reduced ? Math.min(duration, 450) : duration)
   }
 
   function execute(job: Job) {
     if (!state || finishWork.current) return
     const visual = job.work
-    if (job.id === 'hide' || job.id === 'stock' || job.id === 'safe-mode') setSheltered(true)
-    animate({ label: job.title, work: { ...visual, working: true }, sending: !!job.transmit }, () => {
+    function finish() {
       setDraftWork({})
       setFinishedJob(job)
       setFeedback(job.next)
       setQueued(null)
+      setShelterPhase(null)
       if (job.id === 'walk' || visual.roverStops) setKit(true)
       const delta = job.next.log.at(-1)!.delta
       for (const key of Object.keys(delta) as Reading[]) {
         if (delta[key]) cue(key === 'exposure' ? delta[key] < 0 : delta[key] > 0)
       }
-    }, job.transmit ? radio.roundTripMs : visual.roverStops ? 12000 : 1500)
+    }
+    function takeShelter() {
+      setShelterPhase('approach')
+      lastSite.current = 'shelter'
+      animate({ label: 'Taking shelter', work: { shelterRun: true, pods: visual.pods }, sending: false }, finish, 18000)
+    }
+    if (stormWatch && (job.id === 'hide' || job.id === 'stock' || job.id === 'safe-mode')) takeShelter()
+    else animate({ label: job.title, work: { ...visual, working: true }, sending: !!job.transmit }, stormWatch ? takeShelter : finish,
+      job.transmit ? radio.roundTripMs : visual.roverStops ? 18000 : 1500)
   }
 
   function plan(draft?: Draft) {
-    if (!state || !occupied || feedback || finishWork.current) return
+    if (!state || (!occupied && draft?.choice.id !== 'hide') || feedback || finishWork.current) return
     const choice = draft?.choice
     const id = choice?.id ?? 'safe-mode'
-    const next = choose(state, id, draft?.bed)
+    const next = choose(state, id, draft?.bed, draft?.settings)
     if (next === state) return
-    const site = choice?.greenhouse ? 'garden' : workSites[id] ?? objective
-    const job = { id, site, next, greenhouse: !!choice?.greenhouse, work: draft ? workFor(draft) : visuals['safe-mode'],
+    const site = choice?.greenhouse || choice?.harvest ? 'garden' : workSites[id] ?? objective
+    const job = { id, site, next, draft, work: draft ? workFor(state, draft) : visuals['safe-mode'],
       title: choice?.title ?? 'End the shift early', transmit: choice?.transmit }
     cue(true)
     if (site === objective) execute(job)
@@ -275,7 +302,6 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
     setFeedback(null)
     setDraftWork({})
     setOccupied(false)
-    if (feedback.node !== 'shelter' && feedback.node !== 'relay') setSheltered(false)
     viewport()
   }
 
@@ -286,7 +312,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
     setLayout([null, null, null])
     setPart(0)
     setOccupied(false)
-    setSheltered(false)
+    setShelterPhase(null)
     setKit(false)
     setOverview(false)
     setMount(null)
@@ -316,16 +342,22 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
         <button className="secondary" aria-pressed={sound} onClick={onSound}><Icon name={sound ? 'sound' : 'mute'} />Game sound</button>
       </div>
     </div> : <>
-      {displayed && <Resources state={displayed} feedback={!!feedback} />}
+      {(displayed || stage === 'build') && <Resources state={displayed ?? { ...seed, power: setupBalance }} feedback={!!feedback} />}
       <div className="campaign-grid">
         <div>
           <div className="world-stage campaign-world" ref={world}>
             {!unavailable ? <Suspense fallback={<div className="world-placeholder">Loading Farpoint…</div>}>
               <LunarScene key={run} state={sceneState} onInteract={interact} onOverview={() => setOverview(!overview)}
-                onUnavailable={() => { setUnavailable(true); complete() }} onRoverArrived={complete}
+                onUnavailable={() => { setUnavailable(true); complete() }}
+                onRoverArrived={() => { if (activity?.work.roverStops) complete() }}
+                onShelterPhase={(phase) => { if (phase === 'complete') complete(); else setShelterPhase(phase) }}
                 onTouchdown={() => { setStage('build'); setOccupied(true); cue(true) }} />
             </Suspense> : <div className="world-placeholder"><p>This mission needs WebGL 2 to render the outpost.</p><button className="secondary" onClick={() => { setUnavailable(false); setRun(run + 1) }}>Retry 3D view</button></div>}
-            {(activity || setupResult || feedback) && <div className="world-action-status" role="status">
+            {stormStatus && <div className="storm-banner" data-phase={stormStatus} role={incoming ? 'alert' : 'status'}>
+              <Icon name={stormStatus === 'clear' ? 'check' : stormStatus === 'inside' ? 'shield' : 'storm'} size={23} />
+              <strong>{stormStatus === 'clear' ? 'Storm front passed' : stormStatus === 'inside' ? 'Hatch sealed · Ride it out' : stormStatus === 'approach' ? 'Crew heading to shelter' : 'Storm incoming'}</strong>
+            </div>}
+            {(activity || setupResult || feedback) && !shelterPhase && <div className="world-action-status" role="status">
               <Icon name={activity?.sending ? 'radio' : activity ? 'bolt' : 'check'} size={19} />
               <span>{activity?.sending ? 'Signal in flight · 2.56 s round trip' : activity?.label || setupResult || 'Task complete'}</span>
               {!activity && <button className="world-button" onClick={() => station.current?.scrollIntoView({ block: 'nearest' })}>View result</button>}
@@ -347,7 +379,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
             extra={<button className="secondary" onClick={() => { setInspecting(null); viewport() }}>Back to waypoint</button>} />
             : report && state ? <FlightLog state={state} onRetry={retry} />
             : activity ? <div role="status"><h2>{activity.label}</h2>{activity.sending && <div className="radio-track"><i /></div>}</div>
-            : setupResult ? <><h2>{setupResult}</h2><button className="primary" onClick={nextModule}>Next waypoint <Icon name="arrow" /></button></>
+            : setupResult ? <><h2>{setupResult}</h2><p className="watch-cost"><Icon name="battery" size={18} /> −{installationCost(part, !!layout[part])} battery</p><button className="primary" onClick={nextModule}>Next waypoint <Icon name="arrow" /></button></>
             : feedback && state ? <>
               <div className="choice-result" role="status"><h2>{feedback.log.at(-1)?.title}</h2><p>{feedback.log.at(-1)?.detail}</p>
                 <Consequences before={state} after={feedback} />
@@ -368,9 +400,13 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
             </button></>
             : stage === 'landing' ? <h2 role="status">Landing at {landingSites[site].name}…</h2>
             : pendingMount !== null ? <><h2>{pendingMount ? module.far : module.near}</h2>
-              <p>Installation costs {pendingMount ? '2 battery' : '0 battery'} when you build.</p>
+              <p className="watch-cost"><Icon name="battery" size={18} /> −{installationCost(part, pendingMount)} battery at installation</p>
               <button className="secondary" onClick={() => { setPendingMount(null); setHoverMount(null); setOccupied(true); setOverview(false) }}>Compare mounts again</button></>
-            : !occupied || unavailable ? <><h2>{sites[objective].name}</h2>{queued && <p><strong>Selected task</strong> · {queued.title}</p>}</>
+            : !occupied || unavailable ? <><h2>{sites[objective].name}</h2>{queued && <p><strong>Selected task</strong> · {queued.title}</p>}
+              {earlyShelter && state && <button className="secondary" disabled={choose(state, earlyShelter.id) === state}
+                onClick={() => plan({ choice: earlyShelter, bed: 0, settings: {} })}>
+                <Icon name="shield" size={18} /> Head straight to shelter
+              </button>}</>
             : stage === 'build' ? <>
               <h2>Install the {module.name.toLowerCase()}</h2>
               <p>Preview both mounts. Choose where to build, then head there to install it.</p>
@@ -379,10 +415,10 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
                   onMouseEnter={() => setHoverMount(outer)} onMouseLeave={() => setHoverMount(null)}
                   onFocus={() => setHoverMount(outer)} onBlur={() => setHoverMount(null)} onClick={() => { setMount(outer); viewport(); cue(true) }}>
                   <Icon name={module.icon} /><strong>{outer ? module.far : module.near}</strong>
-                  {outer && <span>{module.gain}</span>}<small>{outer ? '−2' : '0'} installation battery</small>
+                  {outer && <span>{module.gain}</span>}<small><Icon name="battery" size={16} /> −{installationCost(part, outer)} battery</small>
                 </button>)}
               </div>
-              <p>{seed.power} battery in your setup budget{previewMount === null ? '.' : ' · ' + (seed.power - (previewMount ? 2 : 0)) + ' left with this mount.'}</p>
+              {previewMount !== null && <p className="watch-cost"><Icon name="battery" size={18} /> {setupBalance - installationCost(part, previewMount)} battery after installation</p>}
               <button className="primary" disabled={mount === null} onClick={() => {
                 if (mount === null) return
                 setPendingMount(mount)
@@ -394,9 +430,9 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
             </>
             : state && <>
               {state.node === 'warning' && <p><a href={storm.url} target="_blank" rel="noreferrer">Archived DONKI event</a> · Exposure uses game points.</p>}
-              <StationLab key={state.watch + ':' + objective} state={state} site={objective} choices={stationOptions} initialChoice={queued?.id}
+              <StationLab key={state.watch + ':' + objective} state={state} site={objective} choices={stationOptions} initialDraft={queued?.draft}
                 onPreview={(draft) => {
-                  const work = workFor(draft)
+                  const work = workFor(state, draft)
                   setDraftWork({ light: objective === 'garden' ? work.light : undefined, bearing: work.bearing, pods: work.pods })
                 }} onCommit={plan}
                 extra={queued ? <button className="text-button" onClick={() => { setQueued(null); setOccupied(false); setDraftWork({}); viewport() }}>Change destination</button>

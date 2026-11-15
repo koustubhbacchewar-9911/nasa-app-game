@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { IconName } from '../mission'
 
-const paths: Record<IconName | 'orbit' | 'down' | 'back' | 'external' | 'target' | 'expand' | 'collapse' | 'bolt' | 'water' | 'console' | 'clock', ReactNode> = {
+const paths: Record<IconName | 'orbit' | 'down' | 'back' | 'external' | 'target' | 'expand' | 'collapse' | 'bolt' | 'water' | 'console' | 'clock' | 'food', ReactNode> = {
   sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></>,
   storm: <path d="M7 16H6a4 4 0 1 1 1-7.9 5.5 5.5 0 0 1 10.5 1.5 3.2 3.2 0 0 1 0 6.4H17m-4-4-3 5h4l-2 5"/>,
   radio: <><path d="M3.5 8.5a12 12 0 0 1 17 0m-14 3a8 8 0 0 1 11 0m-8 3a4 4 0 0 1 5 0"/><circle cx="12" cy="18" r="1"/></>,
@@ -35,6 +35,7 @@ const paths: Record<IconName | 'orbit' | 'down' | 'back' | 'external' | 'target'
   water: <path d="M12 3c-1 3-6 6.5-6 11a6 6 0 1 0 12 0c0-4.5-5-8-6-11Z"/>,
   console: <><rect x="3" y="4" width="18" height="14" rx="2"/><path d="m7 8 3 3-3 3m6 0h4m-8 7h6"/></>,
   clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+  food: <><rect x="5" y="7" width="14" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M5 11h14m-10 4h6m-3-2v4"/></>,
 }
 
 export type UiIcon = keyof typeof paths

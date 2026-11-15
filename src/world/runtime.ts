@@ -5,8 +5,10 @@ import { astronaut, outpost, pipModel } from './models'
 import { canWalk, expeditionBarriers, expeditionSites, moduleMount, moduleSites, reach, sectors, sites, spawn } from './layout'
 import type { Sector, SiteId } from './layout'
 import { elevation, sky, terrain } from './environment'
+import { createTrail } from './trail'
 
-export type WorkVisual = { target?: SiteId; working?: boolean; bearing?: number; pods?: number; light?: number; roverStops?: ('kit' | 'shelter' | 'ridge')[]; pose?: 'rest' | 'sample' | 'carry'; pulse?: 'power' | 'oxygen' }
+export type ShelterPhase = 'approach' | 'inside' | 'clear' | 'complete'
+export type WorkVisual = { target?: SiteId; working?: boolean; bearing?: number; pods?: number; light?: number; roverStops?: ('kit' | 'shelter' | 'ridge')[]; roverPower?: number; shelterRun?: boolean; pose?: 'rest' | 'sample' | 'carry'; pulse?: 'power' | 'oxygen' }
 export type WorldState = {
   site: SiteId
   turn: number
@@ -23,7 +25,7 @@ export type WorldState = {
   overview: boolean
   expedition?: {
     sector: Sector; recon: boolean; descent: boolean
-    layout: readonly (boolean | null)[]; sheltered: boolean; sampleCollected: boolean
+    layout: readonly (boolean | null)[]; sampleCollected: boolean
     plants: readonly { health: number; growth: number }[]
     preview?: { part: number; outer: boolean }
     pending?: { part: number; outer: boolean }
@@ -31,7 +33,7 @@ export type WorldState = {
   }
 }
 
-type Callbacks = { onNear: (value: SiteId | null) => void; onUse: (site: SiteId) => void; onMap: (x: number, z: number, angle: number, cameraYaw: number) => void; onUnavailable: () => void; onRoverArrived: () => void; onTouchdown?: () => void }
+type Callbacks = { onNear: (value: SiteId | null) => void; onUse: (site: SiteId) => void; onMap: (x: number, z: number, angle: number, cameraYaw: number) => void; onUnavailable: () => void; onRoverArrived: () => void; onTouchdown?: () => void; onShelterPhase?: (phase: ShelterPhase) => void }
 type MoveInput = { x: number; y: number }
 
 const keyControls = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyQ', 'KeyR'])
@@ -163,6 +165,7 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
   scene.add(ambient, fill)
   const campaign = !!initial.expedition
   const heightAt = (x: number, z: number) => elevation(x, z, campaign)
+  const trail = campaign ? createTrail(scene, heightAt) : undefined
   const floor = terrain(scene, campaign)
   const cosmos = sky(scene)
   const base = outpost(scene, campaign)
@@ -242,7 +245,8 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
     obstacles = expeditionBarriers(expedition.sector, expedition.layout)
     for (const [index, id] of moduleSites.entries()) {
       const { x, z } = worldSites[id]
-      base.consoles[index].position.set(x, heightAt(x, z - .73), z)
+      const consoleX = x + (id === 'shelter' ? 1.35 : 0)
+      base.consoles[index].position.set(consoleX, heightAt(consoleX, z - .73), z)
       base.consoles[index].visible = expedition.layout[index] != null
     }
   }
@@ -266,6 +270,11 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
   let hatchOpened = false
   let roverRoute: T.Vector3[] = []
   let moving = false
+  const trailOrigin = new T.Vector3(Infinity, 0, Infinity)
+  let trailSite: SiteId | null = null
+  let trailTime = 0
+  let shelter: { phase: ShelterPhase; route: T.Vector3[]; entrance: T.Vector3; approach: T.Vector3; time: number } | undefined
+  let doorOpen = false
   let drag: { x: number; y: number; total: number; id: number } | null = null
   const pressed = new Set<string>()
   const touch: MoveInput = { x: 0, y: 0 }
@@ -286,6 +295,59 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
     lookAt.set(x, 2, z)
     directional.intensity = initial.light ? 2.75 : .25
     ambient.intensity = initial.light ? 1.32 : 1.12
+  }
+
+  function shelterStep(dt: number, reduced: boolean) {
+    const slot = state.expedition?.layout[1]
+    if (!state.work.shelterRun || slot == null) {
+      shelter = undefined
+      doorOpen = false
+      return
+    }
+    const position = cadet.root.position
+    if (!shelter) {
+      const mount = moduleMount(1, slot)
+      const { approach } = mount
+      const outside = new T.Vector3(approach.x, 0, approach.z)
+      const inside = new T.Vector3(mount.x, 0, mount.z).lerp(outside, .49)
+      shelter = { phase: 'approach', entrance: inside, approach: outside, route: route(position, outside), time: 0 }
+    }
+    const drill = shelter
+    drill.time += dt
+    const changePhase = (phase: ShelterPhase) => {
+      drill.phase = phase
+      drill.time = 0
+      callbacks.onShelterPhase?.(phase)
+    }
+    if (drill.phase === 'approach') {
+      const target = drill.route[0] ?? drill.entrance
+      doorOpen = Math.hypot(position.x - drill.approach.x, position.z - drill.approach.z) < 3
+      if (reduced ? drill.time >= .6 : advanceCadet(target, dt) && !drill.route.length) {
+        position.copy(drill.entrance)
+        doorOpen = false
+        changePhase('inside')
+      } else if (Math.hypot(position.x - target.x, position.z - target.z) < .12 && drill.route.length) drill.route.shift()
+    } else if (drill.phase === 'inside' && drill.time > (reduced ? .9 : 2.8)) {
+      doorOpen = true
+      changePhase('clear')
+    } else if (drill.phase === 'clear' && drill.time > (reduced ? .65 : .55)) {
+      if (reduced || advanceCadet(drill.approach, dt)) {
+        position.copy(drill.approach)
+        const { x, z } = drill.entrance
+        azimuth = Math.atan2(drill.approach.x - x, drill.approach.z - z)
+        doorOpen = false
+        changePhase('complete')
+      }
+    }
+    function advanceCadet(target: T.Vector3, stepTime: number) {
+      walkingVector.set(target.x - position.x, 0, target.z - position.z)
+      const distance = walkingVector.length()
+      if (distance < .09) return true
+      angle = tweenAngle(angle, Math.atan2(-walkingVector.x, -walkingVector.z), 1 - Math.exp(-stepTime * 14))
+      position.addScaledVector(walkingVector, Math.min(1, stepTime * (doorOpen ? 3.5 : 9) / distance))
+      moving = true
+      return false
+    }
   }
 
   function resize() {
@@ -425,6 +487,7 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
       moving = false
     }
 
+    if (campaign) shelterStep(dt, reduced)
     const position = cadet.root.position
     position.y = heightAt(position.x, position.z) + .075
     const activeSite = worldSites[state.site]
@@ -432,8 +495,8 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
     const surveying = !!expedition?.recon
     const landing = !!expedition?.descent
     const landingSite = expedition && sectors[expedition.sector]
-    cadet.root.visible = !surveying && !landing
-    if (state.opened) {
+    cadet.root.visible = !surveying && !landing && shelter?.phase !== 'inside'
+    if (state.opened && !shelter) {
       angle = tweenAngle(angle, Math.atan2(position.x - activeSite.x, position.z - (activeSite.z - .73)), 1 - Math.exp(-dt * 9))
     }
     cadet.root.rotation.y = angle
@@ -452,7 +515,20 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
       cadet.arms[i].rotation.x = doing ? 1.24 + (reduced ? 0 : Math.sin(workingTime * 17 + i) * .19) : gait * (i === 0 ? -.78 : .78)
     }
     pad.position.set(position.x, position.y - .025, position.z)
-    pad.visible = !intro && !surveying && !landing
+    pad.visible = cadet.root.visible && !intro && !shelter
+    if (trail) {
+      const target = shelter?.phase === 'approach' ? worldSites.shelter : activeSite
+      const nextSite = shelter?.phase === 'approach' ? 'shelter' : state.site
+      if ((state.locked && !shelter) || Math.hypot(position.x - target.x, position.z - target.z) < reach || (shelter && shelter.phase !== 'approach')) {
+        trail.hide()
+        trailSite = null
+      } else if (nextSite !== trailSite || (time > trailTime + 180 && Math.hypot(position.x - trailOrigin.x, position.z - trailOrigin.z) > .55)) {
+        trailSite = nextSite
+        trailOrigin.copy(position)
+        trailTime = time
+        trail.draw(position, route(position, new T.Vector3(target.x, 0, target.z)), target.color)
+      }
+    }
 
     let near: SiteId | null = null
     let closest = reach
@@ -479,10 +555,11 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
     }
 
     const alpha = 1 - Math.exp(-dt * 4)
-    directional.intensity = T.MathUtils.lerp(directional.intensity, state.light ? 2.75 : .25, alpha)
+    directional.intensity = T.MathUtils.lerp(directional.intensity, state.light ? state.storm && campaign ? 1.72 : 2.75 : .25, alpha)
     ambient.intensity = T.MathUtils.lerp(ambient.intensity, state.light ? 1.32 : 1.12, alpha)
     cosmos.storm.visible = state.storm
-    cosmos.storm.position.y = reduced ? 0 : -.8 * Math.sin(clock * 2.4)
+    cosmos.storm.position.y = reduced ? 0 : shelter?.phase === 'inside' ? shelter.time * .95 : -.8 * Math.sin(clock * 2.4)
+    cosmos.storm.position.x = shelter?.phase === 'inside' && !reduced ? shelter.time * 9 : 0
     cosmos.earth.rotation.y = clock * .014
     const assignments = { mira: state.site === 'shelter' ? worldSites.shelter : worldSites.power, jo: worldSites.garden, ren: worldSites.radio, pip: worldSites.rover }
     for (const [id, actor] of Object.entries(npc) as [CrewId, typeof cadet][]) {
@@ -490,7 +567,7 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
       const offset = id === 'mira' ? -1.95 : 1.9
       const alongRover = id === 'pip' && !!state.work.roverStops
       const guiding = id === 'pip' && !!state.expedition && !alongRover
-      const sheltered = id !== 'pip' && state.expedition?.sheltered
+      const sheltered = id !== 'pip' && shelter
       const x = alongRover ? base.rover.position.x + .65 : guiding ? position.x + 1.1 : sheltered ? worldSites.shelter.x + offset * .8 : site.x + offset
       const z = alongRover ? base.rover.position.z : guiding ? position.z + .8 : sheltered ? worldSites.shelter.z - (id === 'ren' ? 1.1 : .15) : site.z
       const firstFrame = clock <= dt
@@ -498,7 +575,7 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
       actor.root.position.x = T.MathUtils.lerp(firstFrame ? x : actor.root.position.x, x, alpha)
       actor.root.position.z = T.MathUtils.lerp(firstFrame ? z : actor.root.position.z, z, alpha)
       actor.root.position.y = heightAt(actor.root.position.x, actor.root.position.z) + (id === 'pip' && !reduced ? .18 + Math.sin(clock * 4) * .085 : .07)
-      actor.root.visible = !surveying && !landing
+      actor.root.visible = !surveying && !landing && shelter?.phase !== 'inside'
       actor.root.rotation.y = guiding ? angle : .32 + Math.sin(clock * 1.1) * .16
       if (state.expedition && id !== 'pip') actor.legs.forEach((leg, i) => {
         leg.rotation.x = inTransit && !reduced ? Math.sin(clock * 13 + i * Math.PI) * .45 : 0
@@ -516,11 +593,11 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
     base.dish.rotation.y = tweenAngle(base.dish.rotation.y, antenna, alpha)
     for (const [index, pod] of base.waterPods.entries()) {
       const movingToGap = index < (state.work.pods ?? 0)
-      const raised = index < raisedPods || (movingToGap && doing)
+      const raised = index < raisedPods || (movingToGap && (doing || !!shelter))
       pod.position.x = T.MathUtils.lerp(pod.position.x, movingToGap || raised ? 1.14 + index * .48 : 0, alpha)
       pod.position.y = T.MathUtils.lerp(pod.position.y, raised ? .83 : 0, alpha)
     }
-    const openHatch = state.expedition ? state.expedition.sheltered : hatchOpened && state.turn === 2
+    const openHatch = campaign ? doorOpen : hatchOpened && state.turn === 2
     base.hatch.position.x = T.MathUtils.lerp(base.hatch.position.x, openHatch ? 1.01 : 0, alpha)
     const lightSetting = state.opened ? state.work.light ?? cropPower : cropPower
     base.growLight.emissiveIntensity = T.MathUtils.lerp(base.growLight.emissiveIntensity, .23 + lightSetting * .4, alpha)
@@ -582,6 +659,7 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
           return
         }
         const spot = moduleMount(i, slot)
+        if (i === 1) part.rotation.y = Math.atan2(spot.approach.x - spot.x, spot.approach.z - spot.z)
         const ground = heightAt(spot.x, spot.z) + .06
         if (previews[i].slot !== slot || previews[i].installed !== installed) {
           part.scale.setScalar(reduced ? 1 : installed ? .32 : .8)
@@ -614,7 +692,8 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
       if (distance < .09) roverRoute.shift()
       else {
         base.rover.rotation.y = tweenAngle(base.rover.rotation.y, Math.atan2(walkingVector.x, walkingVector.z), 1 - Math.exp(-dt * 10))
-        roverPosition.addScaledVector(walkingVector.normalize(), Math.min(distance, dt * (reduced ? 32 : 12)))
+        const speed = state.work.roverPower ? 6 + state.work.roverPower * 2 : 12
+        roverPosition.addScaledVector(walkingVector.normalize(), Math.min(distance, dt * (reduced ? 32 : speed)))
         for (const wheel of base.wheels) wheel.rotation.x -= dt * 11
       }
     }
@@ -665,6 +744,16 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
       const ground = heightAt(x, z)
       desiredCamera.set(x + 10, ground + 9, z + 12)
       cameraTarget.set(x, ground + 1 + (base.craft.position.y - ground) * .58, z)
+    } else if (shelter) {
+      const { approach, entrance } = shelter
+      const close = Math.hypot(position.x - approach.x, position.z - approach.z) < 5
+      if (close) {
+        desiredCamera.set(approach.x + 4.5, position.y + 5.5, approach.z + Math.sign(approach.z - entrance.z) * 3.5)
+        cameraTarget.set(entrance.x, position.y + 1.25, entrance.z)
+      } else {
+        desiredCamera.set(position.x + Math.sin(angle) * 5, position.y + 4.4, position.z + Math.cos(angle) * 5)
+        cameraTarget.set(position.x, position.y + .85, position.z)
+      }
     } else if (state.overview || (state.opened && requestedStops && roverStopIndex < requestedStops.length)) {
       desiredCamera.set(position.x * .19 + Math.sin(azimuth) * 28, 38, position.z * .16 + Math.cos(azimuth) * 29)
       cameraTarget.set(position.x * .16, 0, position.z * .16 - 2)
@@ -708,6 +797,7 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
         const after = next.expedition
         if (!before || after.sector !== before.sector || after.layout !== before.layout || after.pending?.part !== before.pending?.part || after.pending?.outer !== before.pending?.outer) {
           syncGeography(after)
+          trailSite = null
           previousNear = null
           callbacks.onNear(null)
         }

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { choose, colonyFrame, harvestCount, panelOutput, startColony, sunlight } from '../src/colony.ts'
+import { choose, colonyFrame, harvestCount, installationCost, panelOutput, setupPower, startColony, sunlight } from '../src/colony.ts'
 import { canWalk, expeditionBarriers, expeditionSites, moduleMount, moduleSites, sectors } from '../src/world/layout.ts'
 
 test('landing time and solar placement change available energy', () => {
   const ridge = startColony('ridge', [true, false, false])
   const rim = startColony('basin', [false, false, false])
-  assert.equal(ridge.power, 12)
+  assert.equal(ridge.power, 7)
   assert.equal(sunlight(ridge), 8)
   assert.equal(sunlight(choose(ridge, 'reserve')), 8)
   assert.equal(colonyFrame(rim).frame, 61)
@@ -90,7 +90,59 @@ test('solar maintenance spends battery now and improves subsequent sunlit output
   const reserve = choose(colony, 'reserve')
   const serviced = choose(colony, 'service-array')
   assert.equal(serviced.power, reserve.power - 2)
-  assert.equal(sunlight(serviced), sunlight(reserve) + 1)
+  assert.equal(sunlight(serviced), sunlight(reserve) + 3)
   assert.equal(panelOutput(serviced).reduce((sum, bank) => sum + bank, 0), sunlight(serviced))
   assert.ok(panelOutput(choose(serviced, 'hide')).every((bank) => bank === 0))
+})
+
+test('all mounts use battery and the setup meter matches the mission budget', () => {
+  const layout = [false, true, false]
+  const expected = 14 - installationCost(0, false) - installationCost(1, true) - installationCost(2, false)
+  assert.equal(setupPower('ridge', [null, null, null]), 14)
+  assert.equal(setupPower('ridge', layout), expected)
+  assert.equal(startColony('ridge', layout).power, expected)
+  for (let part = 0; part < 3; part++) {
+    assert.ok(installationCost(part, false) > 0)
+    assert.ok(installationCost(part, true) > installationCost(part, false))
+  }
+})
+
+test('a high grow-light setting can price the crew out of the next task in shadow', () => {
+  const base = startColony('basin', [false, true, true])
+  const low = choose(base, 'grow', 0, { level: 1 })
+  const high = choose(base, 'grow', 0, { level: 8, mist: true })
+  assert.equal(harvestCount(low), 0)
+  assert.equal(harvestCount(high), 3)
+  assert.ok(low.power > high.power)
+  assert.equal(choose(high, 'warn', 0, { level: 5 }), high)
+  assert.notEqual(choose(low, 'warn', 0, { level: 5 }), low)
+})
+
+test('the crew eats every watch, a harvest replenishes food, and a missed meal ends the shift', () => {
+  const base = startColony('ridge', [false, false, false])
+  const grown = choose(base, 'grow', 0, { level: 4 })
+  assert.equal(grown.food, base.food - 1)
+  const shelter = choose(choose(grown, 'hide'), 'pods')
+  const harvest = choose(shelter, 'harvest')
+  assert.equal(harvest.food, 4)
+  assert.equal(harvestCount(harvest), 0)
+  assert.equal(choose(harvest, 'handover-reserve').food, 3)
+  const hungry = choose({ ...shelter, food: 0 }, 'sample')
+  assert.equal(hungry.node, 'report')
+  assert.equal(hungry.missedMeal, true)
+})
+
+test('radio power, aim, and water pods change mission outcomes', () => {
+  const warning = choose(startColony('ridge', [false, false, false]), 'reserve')
+  const weak = choose(warning, 'warn', 0, { bearing: 44, level: 1 })
+  const strong = choose(warning, 'warn', 0, { bearing: 72, level: 5 })
+  assert.equal(weak.contact, false)
+  assert.equal(weak.node, 'shelter')
+  assert.equal(strong.contact, true)
+  assert.equal(strong.node, 'relay')
+  assert.ok(strong.power < weak.power)
+  const open = choose(weak, 'pods', 0, { level: 0 })
+  const sealed = choose(weak, 'pods', 0, { level: 2 })
+  assert.ok(sealed.exposure < open.exposure)
+  assert.ok(sealed.power < open.power)
 })
