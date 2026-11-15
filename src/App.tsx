@@ -6,7 +6,6 @@ import { Debrief } from './Debrief'
 import { createSoundtrack } from './soundtrack'
 import { Home } from './ui/Home'
 import { ColonyMission } from './ui/ColonyMission'
-import { GlassMotion } from './ui/GlassMotion'
 import { Icon } from './ui/Icon'
 import { CrewBrief, FieldReference, MissionMeters, MissionProgress } from './ui/MissionHud'
 import { Overlays } from './ui/Overlays'
@@ -16,6 +15,7 @@ import { jobSites, sites } from './world/layout'
 import type { SiteId } from './world/layout'
 import type { WorldState, WorkVisual } from './world/runtime'
 import './style.css'
+import './ui/relay.css'
 
 const LunarScene = lazy(() => import('./LunarScene').then((module) => ({ default: module.LunarScene })))
 
@@ -132,7 +132,7 @@ function App() {
     setPage('home')
   }
 
-  function launch(showDemo: boolean, explore = false) {
+  function launch(showDemo: boolean) {
     resetInteraction()
     setDemo(showDemo)
     setOverview(false)
@@ -140,7 +140,7 @@ function App() {
     setAtStation(showDemo)
     setMission(showDemo ? demoStart() : newMission())
     setOverlay(null)
-    setPage(showDemo || explore ? 'game' : 'colony')
+    setPage(showDemo ? 'game' : 'colony')
     ping(true)
   }
 
@@ -229,15 +229,14 @@ function App() {
       : turn.prompt
 
   return <div className="app-shell">
-    <GlassMotion />
     <a className="skip-link" href="#main-content">Skip to content</a>
     <header className="topbar">
       <div className="topbar-inner content-width">
-        <a className="wordmark" href="./" onClick={(event) => { event.preventDefault(); goHome() }} aria-label="Shadow Shift home">
-          <span className="brand-icon"><Icon name="orbit" size={23} /></span><span>Shadow<span> Shift</span></span>
+        <a className="wordmark" href="./" onClick={(event) => { event.preventDefault(); goHome() }} aria-label="Lunar Outpost home">
+          <span className="brand-icon" aria-hidden="true"><Icon name="moon" size={20} /></span><span>Lunar<span> Outpost</span></span>
         </a>
         <nav aria-label="Game links" className="topnav">
-          <button className="nav-link" aria-label="Meet the crew" onClick={() => setOverlay('crew')}><Icon name="crew" size={18} /><span>Crew</span></button>
+          <button className="nav-link" aria-label="Meet the crew" onClick={() => setOverlay('crew')}><Icon name="crew" size={18} /><span>Meet the crew</span></button>
           <button className="nav-link" aria-label="Explore NASA Moon data" onClick={() => setOverlay('evidence')}><Icon name="moon" size={18} /><span>Moon data</span></button>
           <button className="icon-button sound-button" aria-label={sound ? 'Mute music and effects' : 'Enable music and effects'} aria-pressed={sound} onClick={toggleSound}><Icon name={sound ? 'sound' : 'mute'} size={20} /></button>
         </nav>
@@ -245,7 +244,7 @@ function App() {
     </header>
 
     <main id="main-content" tabIndex={-1}>
-      {page === 'home' && <Home onLaunch={launch} onExplore={() => launch(false, true)} onViewMoon={() => setOverlay('evidence')} />}
+      {page === 'home' && <Home onLaunch={launch} onViewMoon={() => setOverlay('evidence')} />}
       {page === 'colony' && <ColonyMission onExit={goHome} cue={ping} sound={sound} onSound={toggleSound} paused={!!overlay} />}
 
       {page === 'game' && <section className="game-wrap content-width" aria-labelledby="mission-title">
@@ -304,9 +303,9 @@ function App() {
     </main>
 
     <footer className="footer content-width">
-      <div><span className="footer-name">Shadow Shift</span><p>Made for the 2026 NASA Space Apps Challenge.</p></div>
+      <div><span className="footer-name">Lunar Outpost</span><p>Made for the 2026 NASA Space Apps Challenge.</p></div>
       <button className="text-button" onClick={() => setOverlay('sources')}><Icon name="book" size={17} />Data sources</button>
-      <small>NASA Apollo imagery · Code assisted by Codex · Original game sprites by ImageGen</small>
+      <small>NASA Apollo imagery · AI/SI disclosure: OpenAI Codex assisted with code generation. OpenAI ImageGen assisted with crew artwork.</small>
     </footer>
 
     {overlay && <Overlays overlay={overlay} object={object} turn={page === 'home' ? 0 : frameIndex}

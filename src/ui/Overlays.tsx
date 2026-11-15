@@ -54,8 +54,8 @@ type OverlaysProps = {
 }
 
 export function Overlays({ overlay, object, turn, onClose, onViewMoon }: OverlaysProps) {
-  if (overlay === 'crew') return <Modal label="Meet your crew" onClose={onClose}>
-    <div className="crew-modal-grid">{(Object.keys(crew) as CrewId[]).map((id) => <article key={id}>
+  if (overlay === 'crew') return <Modal label="Meet the crew" onClose={onClose}>
+    <div className="crew-modal-grid">{(Object.keys(crew) as CrewId[]).map((id) => <article key={id} data-crew={id}>
       <Avatar id={id} /><div><h3>{crew[id].name}</h3><small>{crew[id].role}</small><p>{crew[id].line}</p></div>
     </article>)}</div>
   </Modal>

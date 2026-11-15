@@ -8,7 +8,8 @@ import { elevation, sky, terrain } from './environment'
 import { createTrail } from './trail'
 
 export type ShelterPhase = 'approach' | 'inside' | 'clear' | 'complete'
-export type WorkVisual = { target?: SiteId; working?: boolean; bearing?: number; pods?: number; light?: number; roverStops?: ('kit' | 'shelter' | 'ridge')[]; roverPower?: number; shelterRun?: boolean; pose?: 'rest' | 'sample' | 'carry'; pulse?: 'power' | 'oxygen' }
+type RoverStop = 'kit' | 'shelter' | 'ridge'
+export type WorkVisual = { target?: SiteId; working?: boolean; bearing?: number; pods?: number; light?: number; roverStops?: RoverStop[]; routePreview?: RoverStop[]; roverPower?: number; roverSurvey?: boolean; shelterRun?: boolean; pose?: 'rest' | 'sample' | 'carry'; pulse?: 'power' | 'oxygen' }
 export type WorldState = {
   site: SiteId
   turn: number
@@ -29,6 +30,7 @@ export type WorldState = {
     plants: readonly { health: number; growth: number }[]
     preview?: { part: number; outer: boolean }
     pending?: { part: number; outer: boolean }
+    building?: number
     focusModule?: number
   }
 }
@@ -37,7 +39,7 @@ type Callbacks = { onNear: (value: SiteId | null) => void; onUse: (site: SiteId)
 type MoveInput = { x: number; y: number }
 
 const keyControls = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyQ', 'KeyR'])
-const crewColors = { mira: '#e6ac61', jo: '#7fbd91', ren: '#7794d3', pip: '#e4b15c' }
+const crewColors = { mira: '#9d79d0', jo: '#7fbd91', ren: '#7794d3', pip: '#e4b15c' }
 const roverWaypoints = { kit: new T.Vector3(17.3, 0, 1.35), shelter: new T.Vector3(-7.35, 0, -10.5), ridge: new T.Vector3(17, 0, 10) }
 const cameraTarget = new T.Vector3()
 const up = new T.Vector3(0, 1, 0)
@@ -166,9 +168,11 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
   const campaign = !!initial.expedition
   const heightAt = (x: number, z: number) => elevation(x, z, campaign)
   const trail = campaign ? createTrail(scene, heightAt) : undefined
+  const roverTrail = campaign ? createTrail(scene, heightAt, .93) : undefined
   const floor = terrain(scene, campaign)
   const cosmos = sky(scene)
   const base = outpost(scene, campaign)
+  const networkPaths = campaign ? (Object.keys(sites) as SiteId[]).map((id) => [id, createTrail(scene, heightAt, .22)] as const) : []
   const expeditionParts = campaign ? [base.craft, ...base.pads.map(({ pad }) => pad), ...base.modules, ...base.consoles] : []
   if (campaign) {
     for (const { pad } of base.pads) pad.position.y = heightAt(pad.position.x, pad.position.z) + .04
@@ -179,8 +183,21 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
     }
   }
   batchOutpost(scene, [floor, cosmos.earth, cosmos.sun, cosmos.storm, base.rover, base.dish, base.water, base.hatch, base.kit, ...base.crops, ...Object.values(base.beacons), ...expeditionParts])
+  const mountGhostMaterial = new T.MeshBasicMaterial({ color: '#9bb8d1', transparent: true, opacity: .12, depthWrite: false })
+  const mountGhosts = campaign ? base.modules.map((part) => {
+    const ghost = part.clone()
+    ghost.visible = false
+    ghost.traverse((object) => {
+      if (!(object instanceof T.Mesh)) return
+      object.material = mountGhostMaterial
+      object.castShadow = false
+      object.receiveShadow = false
+    })
+    scene.add(ghost)
+    return ghost
+  }) : []
   base.rover.rotation.y = .48
-  const cadet = astronaut('#e7ae67')
+  const cadet = astronaut('#f5d24f')
   scene.add(cadet.root)
   const npc = Object.fromEntries(Object.entries(crewColors).map(([id, color]) => {
     const actor = id === 'pip' ? pipModel() : astronaut(color, id as CrewId)
@@ -249,6 +266,16 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
       base.consoles[index].position.set(consoleX, heightAt(consoleX, z - .73), z)
       base.consoles[index].visible = expedition.layout[index] != null
     }
+    const hub = new T.Vector3(1, 0, 6)
+    for (const [id, path] of networkPaths) {
+      const module = moduleSites.findIndex((site) => site === id)
+      if (module >= 0 && expedition.layout[module] == null) {
+        path.hide()
+        continue
+      }
+      const { x, z } = worldSites[id]
+      path.draw(hub, route(hub, new T.Vector3(x, 0, z)), '#43d8d9')
+    }
   }
   let azimuth = 0
   let height = 5.2
@@ -269,6 +296,8 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
   let roverHasKit = false
   let hatchOpened = false
   let roverRoute: T.Vector3[] = []
+  let previousPreview: WorkVisual['routePreview']
+  let roverLoaded = false
   let moving = false
   const trailOrigin = new T.Vector3(Infinity, 0, Infinity)
   let trailSite: SiteId | null = null
@@ -383,7 +412,7 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
     targetMarker.visible = false
   }
   function pointerDown(event: PointerEvent) {
-    if (state.locked || event.button !== 0 || intro) return
+    if (event.button !== 0 || intro || state.expedition?.descent) return
     host.focus({ preventScroll: true })
     host.setPointerCapture(event.pointerId)
     drag = { x: event.clientX, y: event.clientY, total: 0, id: event.pointerId }
@@ -624,7 +653,7 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
     }
 
     if (expedition && landingSite) {
-      const progress = reduced ? 1 : Math.min(1, descentTime / 2.6)
+      const progress = reduced ? 1 : Math.min(1, descentTime / 3.8)
       if (landing) descentTime += dt
       const padHeight = heightAt(landingSite.x, landingSite.z)
       base.craft.visible = !surveying
@@ -653,7 +682,9 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
         const { preview, pending } = expedition
         const installed = expedition.layout[i] != null
         const slot = expedition.layout[i] ?? (preview?.part === i ? preview.outer : pending?.part === i ? pending.outer : null)
-        part.visible = slot !== null
+        const ghost = mountGhosts[i]
+        part.visible = installed
+        ghost.visible = slot !== null && !installed
         if (slot === null) {
           previews[i].slot = null
           return
@@ -661,12 +692,28 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
         const spot = moduleMount(i, slot)
         if (i === 1) part.rotation.y = Math.atan2(spot.approach.x - spot.x, spot.approach.z - spot.z)
         const ground = heightAt(spot.x, spot.z) + .06
+        if (ghost.visible) {
+          ghost.position.set(spot.x, ground, spot.z)
+          ghost.rotation.copy(part.rotation)
+        }
         if (previews[i].slot !== slot || previews[i].installed !== installed) {
           part.scale.setScalar(reduced ? 1 : installed ? .32 : .8)
           part.position.set(spot.x, ground, spot.z)
           previews[i] = { slot, installed }
         }
-        part.scale.setScalar(T.MathUtils.lerp(part.scale.x, 1, reduced ? 1 : 1 - Math.exp(-dt * 5)))
+        if (expedition.building === i && !reduced) {
+          const foundation = T.MathUtils.smoothstep(workingTime, 0, 1.4)
+          const assembly = T.MathUtils.smoothstep(workingTime, 1.2, 4.4)
+          part.scale.set(.55 + foundation * .45, .1 + .9 * assembly, .55 + foundation * .45)
+          part.position.y = ground - .12 * (1 - assembly)
+          mountRing.visible = true
+          mountRing.position.set(spot.x, ground + 1.8 * assembly + .12, spot.z)
+          mountRing.scale.setScalar(i === 2 ? .62 : .96)
+          mountRing.material.opacity = .42 + Math.sin(clock * 5) * .2
+        } else {
+          part.scale.lerp(TEMP_CROP_SCALE.setScalar(1), reduced ? 1 : alpha)
+          part.position.y = ground
+        }
       })
     }
     workRing.visible = doing && !!(state.work.pulse || state.work.pose === 'sample')
@@ -680,9 +727,24 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
 
     const roverPosition = base.rover.position
     const requestedStops = state.work.roverStops
+    const preview = state.work.routePreview ?? requestedStops
+    if (roverTrail && preview !== previousPreview) {
+      previousPreview = preview
+      if (preview?.length) {
+        let origin = roverPosition.clone()
+        const fullRoute: T.Vector3[] = []
+        for (const stop of preview) {
+          const target = roverTarget(stop)
+          fullRoute.push(...route(origin, target))
+          origin = target
+        }
+        roverTrail.draw(roverPosition, fullRoute, preview.includes('ridge') ? '#85fce3' : '#68caff')
+      } else roverTrail.hide()
+    }
     if (requestedStops && requestedStops !== roverStops) {
       roverStops = requestedStops
       roverStopIndex = 0
+      roverLoaded = false
       roverRoute = route(roverPosition, roverTarget(roverStops[0]))
     }
     if (roverRoute.length) {
@@ -692,13 +754,16 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
       if (distance < .09) roverRoute.shift()
       else {
         base.rover.rotation.y = tweenAngle(base.rover.rotation.y, Math.atan2(walkingVector.x, walkingVector.z), 1 - Math.exp(-dt * 10))
-        const speed = state.work.roverPower ? 6 + state.work.roverPower * 2 : 12
+        const speed = campaign ? 5.3 + (state.work.roverPower ?? 2) * .85 : 12
         roverPosition.addScaledVector(walkingVector.normalize(), Math.min(distance, dt * (reduced ? 32 : speed)))
         for (const wheel of base.wheels) wheel.rotation.x -= dt * 11
       }
     }
     if (roverStops && !roverRoute.length && roverStopIndex < roverStops.length) {
-      if (roverStops[roverStopIndex] === 'kit') roverHasKit = true
+      if (roverStops[roverStopIndex] === 'kit') {
+        roverLoaded = true
+        if (!state.work.roverSurvey) roverHasKit = true
+      }
       roverStopIndex += 1
       if (roverStopIndex === roverStops.length) {
         hatchOpened = true
@@ -708,7 +773,7 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
     }
     roverPosition.y = heightAt(roverPosition.x, roverPosition.z) + .07
     base.kit.visible = !state.kit && !roverHasKit
-    base.roverCargo.visible = state.kit || roverHasKit
+    base.roverCargo.visible = state.kit || roverHasKit || roverLoaded
     if (state.expedition) {
       const carrying = doing && state.work.pose === 'carry'
       if (carrying && base.kit.parent) {
@@ -717,7 +782,7 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
       } else base.kit.position.set(0, 0, 0)
       const sampling = doing && state.work.pose === 'sample'
       const lift = sampling ? Math.min(1, workingTime * 1.2) : 0
-      sample.visible = !state.expedition.sampleCollected
+      sample.visible = !state.expedition.sampleCollected && !(state.work.roverSurvey && roverLoaded)
       sample.position.set(T.MathUtils.lerp(rockSite.x, position.x, lift), heightAt(rockSite.x, rockSite.z) + .23 + lift * .7,
         T.MathUtils.lerp(rockSite.z, position.z - .45, lift))
       sample.rotation.y = sampling && !reduced ? clock : 0
@@ -754,14 +819,18 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
         desiredCamera.set(position.x + Math.sin(angle) * 5, position.y + 4.4, position.z + Math.cos(angle) * 5)
         cameraTarget.set(position.x, position.y + .85, position.z)
       }
-    } else if (state.overview || (state.opened && requestedStops && roverStopIndex < requestedStops.length)) {
-      desiredCamera.set(position.x * .19 + Math.sin(azimuth) * 28, 38, position.z * .16 + Math.cos(azimuth) * 29)
+    } else if (requestedStops && roverStopIndex < requestedStops.length) {
+      const position = base.rover.position
+      desiredCamera.set(position.x + 9, position.y + 12, position.z + 13)
+      cameraTarget.copy(position).y += .8
+    } else if (state.overview || preview?.length) {
+      desiredCamera.set(position.x * .19 + Math.sin(azimuth) * 28, 38 + (height - 5.2) * 2, position.z * .16 + Math.cos(azimuth) * 29)
       cameraTarget.set(position.x * .16, 0, position.z * .16 - 2)
     } else if (state.opened) {
       const viewSite = worldSites[state.work.target ?? state.site]
       const module = expedition?.focusModule
-      if (module !== undefined && base.modules[module].visible) {
-        const placement = base.modules[module].position
+      if (module !== undefined && (base.modules[module].visible || mountGhosts[module]?.visible)) {
+        const placement = (base.modules[module].visible ? base.modules[module] : mountGhosts[module]).position
         desiredCamera.set(placement.x + 6.7, placement.y + 7.5, placement.z + (module === 0 ? -7.8 : 8))
         cameraTarget.set(placement.x, placement.y + 1, placement.z)
       } else {
@@ -771,6 +840,21 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
     } else {
       desiredCamera.set(position.x + Math.sin(azimuth) * range, position.y + height, position.z + Math.cos(azimuth) * range)
       cameraTarget.set(position.x - Math.sin(azimuth) * 3.3, position.y + .75, position.z - Math.cos(azimuth) * 3.3)
+    }
+    const fixedView = surveying || !!shelter || !!(requestedStops && roverStopIndex < requestedStops.length)
+      || (state.opened && !state.overview && !preview?.length)
+    if (fixedView && !landing) {
+      desiredCamera.sub(cameraTarget).applyAxisAngle(up, azimuth).add(cameraTarget)
+      desiredCamera.y += height - 5.2
+    }
+    if (campaign && obstacles && !surveying && !landing && !preview?.length && !state.overview) {
+      const dx = desiredCamera.x - cameraTarget.x
+      const dz = desiredCamera.z - cameraTarget.z
+      const distanceSquared = dx * dx + dz * dz
+      if (distanceSquared > 0 && obstacles.some(({ x, z, r }) => {
+        const fraction = ((x - cameraTarget.x) * dx + (z - cameraTarget.z) * dz) / distanceSquared
+        return fraction > .2 && fraction < 1 && Math.hypot(cameraTarget.x + fraction * dx - x, cameraTarget.z + fraction * dz - z) < r
+      })) desiredCamera.y += 2.6
     }
     camera.position.lerp(desiredCamera, reduced ? 1 : 1 - Math.exp(-dt * 9))
     lookAt.lerp(cameraTarget, reduced ? 1 : 1 - Math.exp(-dt * 17))
@@ -834,6 +918,7 @@ export function createWorld(host: HTMLDivElement, initial: WorldState, callbacks
       host.removeEventListener('lostpointercapture', clearDrag)
       host.removeEventListener('wheel', wheel)
       canvas.removeEventListener('webglcontextlost', callbacks.onUnavailable)
+      mountGhostMaterial.dispose()
       scene.traverse((object) => {
         if (object instanceof T.Mesh || object instanceof T.Points) {
           object.geometry.dispose()

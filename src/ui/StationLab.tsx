@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { beds, briefings, capacity, choose, colonyFrame, harvestCount, panelOutput, planControl, plantLimit, signalStrength, sunlight, tuneChoice } from '../colony'
+import { beds, capacity, choose, colonyFrame, harvestCount, panelOutput, planControl, plantLimit, signalStrength, sunlight, tuneChoice } from '../colony'
 import type { Bed, Colony, PlanSettings, StationChoice } from '../colony'
 import type { SiteId } from '../world/layout'
 import { Icon } from './Icon'
 import type { UiIcon } from './Icon'
+import { isRoverRoute, RoverMap } from './RoverMap'
 import './station-lab.css'
 
 export type Draft = { choice: StationChoice; bed: Bed; settings: PlanSettings }
@@ -79,15 +80,7 @@ function StationReadout({ state, after, site, choice, settings, setBearing }: {
       <Gauge label="Crew exposure after this watch" color="coral" value={after.exposure} max={capacity.exposure} />
     </div>
   }
-  if (site === 'rover') {
-    const route = choice?.id === 'ridge-drive' ? 'Ridge traverse' : choice?.id === 'walk' ? 'Foot trail' : 'Marked rover trail'
-    return <div className="lab-diagram">
-      <div className="lab-summary"><Icon name="rover" /><b>{route}</b></div>
-      <div className="route-readout"><span><Icon name={choice?.id === 'walk' ? 'crew' : 'rover'} />Rover bay</span><i />
-        {choice?.id === 'ridge-drive' && <><span><Icon name="moon" />Ridge</span><i /></>}
-        <span><Icon name="target" />Relay kit</span><i /><span><Icon name="shield" />Shelter</span></div>
-    </div>
-  }
+  if (site === 'rover') return <p className="lab-note">{choice?.detail ?? 'Pip’s electric rover carries samples and equipment.'}</p>
   if (site === 'radio') {
     const bearing = settings.bearing ?? 44
     const signal = choice?.transmit ? signalStrength(choice, settings) : 0
@@ -116,6 +109,7 @@ function StationReadout({ state, after, site, choice, settings, setBearing }: {
 const planIcons: Record<string, UiIcon> = {
   grow: 'plant', harvest: 'food', reserve: 'battery', 'service-array': 'sun', hide: 'shield', warn: 'radio',
   'short-warning': 'bolt', pods: 'water', stock: 'clock', drive: 'rover', 'ridge-drive': 'moon', walk: 'crew',
+  'sample-drive': 'rover', 'sample-ridge': 'moon',
   sample: 'target', scan: 'console', refill: 'air', 'reserve-air': 'battery', earth: 'radio', 'handover-reserve': 'battery',
 }
 
@@ -123,10 +117,11 @@ export function StationLab({ state, site, choices, initialDraft, onPreview, onCo
   state: Colony; site: SiteId; choices: StationChoice[]; initialDraft?: Draft;
   onPreview: (draft: Draft) => void; onCommit: (draft: Draft) => void; extra?: ReactNode
 }) {
-  const [id, setId] = useState(initialDraft?.choice.id ?? choices[0]?.id)
+  const routeMap = site === 'rover' && choices.some(({ id }) => isRoverRoute(id))
+  const [id, setId] = useState(initialDraft?.choice.id ?? (routeMap ? undefined : choices[0]?.id))
   const [bed, setBed] = useState<Bed>(initialDraft?.bed ?? 0)
   const [settings, setSettings] = useState<PlanSettings>(initialDraft?.settings ?? { bearing: 44 })
-  const original = choices.find((item) => item.id === id) ?? choices[0]
+  const original = choices.find((item) => item.id === id) ?? (routeMap ? undefined : choices[0])
   const choice = original && tuneChoice(state, original, settings)
   const control = original && planControl(original)
   const forecast = choice ? choose(state, choice.id, bed, settings) : state
@@ -140,13 +135,19 @@ export function StationLab({ state, site, choices, initialDraft, onPreview, onCo
     setSettings(nextSettings)
     onPreview({ choice: option, bed: targetBed, settings: nextSettings })
   }
+  function pick(option: StationChoice) {
+    select(option, bed, option.id === id ? settings : { bearing: settings.bearing })
+  }
+  const alternativePlans = choices.filter((option) => !routeMap || !isRoverRoute(option.id))
+  const planButtons = alternativePlans.map((option) => <button className="station-button" key={option.id}
+    aria-pressed={id === option.id} onClick={() => pick(option)}>
+    <Icon name={planIcons[option.id] ?? 'console'} size={17} />{option.title}
+  </button>)
   return <section className="station-lab" aria-label={name + ' console'}>
     <h2><Icon name={icon} size={22} />{name}</h2>
-    {!!choices.length && <div className="lab-options" role="group" aria-label="Compare plans">
-      {choices.map((option) => <button className="station-button" key={option.id} aria-pressed={choice?.id === option.id}
-        onClick={() => select(option, bed, option.id === id ? settings : { bearing: settings.bearing })}>
-        <Icon name={planIcons[option.id] ?? 'console'} size={17} />{option.title}</button>)}
-    </div>}
+    {routeMap && <RoverMap choices={choices} selected={id} onSelect={pick} />}
+    {!!planButtons.length && (routeMap ? <details><summary>Other plans</summary><div className="lab-options">{planButtons}</div></details>
+      : <div className="lab-options" role="group" aria-label="Compare plans">{planButtons}</div>)}
     {original && control && <div className="lab-control">
       <label htmlFor="lab-level"><Icon name={planIcons[original.id] ?? 'bolt'} size={18} />{control.label}
         <output htmlFor="lab-level">{settings.level ?? control.value} {control.unit}</output>
@@ -159,42 +160,38 @@ export function StationLab({ state, site, choices, initialDraft, onPreview, onCo
         <Icon name="water" size={17} />Mist roots <span>1 battery</span>
       </label>}
     </div>}
-    {site !== 'garden' && <StationReadout state={state} after={forecast} site={site} choice={choice} settings={settings}
+    {site !== 'garden' && (!routeMap || choice) && <StationReadout state={state} after={forecast} site={site} choice={choice} settings={settings}
       setBearing={(value) => { if (original) select(original, bed, { ...settings, bearing: value }) }} />}
+    {site === 'garden' && <Greenhouse state={state} next={forecast} bed={bed}
+      selectBed={(value) => { if (original) select(original, value, settings); else setBed(value) }} />}
     {choice && original && <div className="lab-forecast">
-        <h3><Icon name="bolt" size={18} />Watch forecast <span>{choice.cost} battery cost</span></h3>
-        {forecast === state ? <strong>More battery needed. Life support gets power first.</strong> : <>
+        <h3><Icon name="bolt" size={18} />After this task <span>{choice.cost} battery cost</span></h3>
+        {forecast === state ? <strong>Battery too low. Oxygen gets power first.</strong> : <>
           <div className="lab-deltas" aria-label="Resource changes">
-            <Delta icon="battery" label="Battery" value={forecast.power - state.power} />
-            <Delta icon="air" label="Oxygen" value={forecast.oxygen - state.oxygen} />
-            <Delta icon="food" label="Food" value={forecast.food - state.food} />
-            <Delta icon="shield" label="Exposure" value={forecast.exposure - state.exposure} inverse />
+            {forecast.oxygen !== state.oxygen && <Delta icon="air" label="Oxygen" value={forecast.oxygen - state.oxygen} />}
+            {forecast.exposure !== state.exposure && <Delta icon="shield" label="Exposure" value={forecast.exposure - state.exposure} inverse />}
+            {forecast.food > state.food && <Delta icon="food" label="Meals added" value={forecast.food - state.food} />}
             {harvestCount(forecast) !== harvestCount(state) && <Delta icon="plant" label="Ready to harvest" value={harvestCount(forecast) - harvestCount(state)} />}
             {choice.greenhouse && <Delta icon="sun" label="Bed growth" value={growthDelta} />}
             {!!healthDelta && <Delta icon="water" label="Bed health" value={healthDelta} />}
             {forecast.contact && !state.contact && <span className="lab-delta" data-tone="gain"><Icon name="radio" size={16} />Earth notified</span>}
             {forecast.research && !state.research && <span className="lab-delta" data-tone="gain"><Icon name="target" size={16} />Sample recovered</span>}
           </div>
-          <div className="lab-totals">
-            <span><Icon name="battery" size={16} /> {forecast.power} battery left</span>
-            <span><Icon name="arrow" size={15} /> {briefings[forecast.node].title}</span>
-          </div>
+          <div className="lab-totals"><span>{forecast.power} battery left</span><span>{forecast.food} meals left</span></div>
           {forecast.node !== 'report' && forecast.power + sunlight(forecast) < 3 &&
-            <p className="decision-danger">Next watch, the air machine will need backup oxygen.</p>}
-          {forecast.missedMeal ? <p className="decision-danger">There’s no food for this watch. The crew will end the shift.</p>
-            : forecast.oxygen === 0 || forecast.exposure === capacity.exposure ? <p className="decision-danger">This plan reaches a crew safety limit and ends the shift.</p>
+            <p className="decision-danger">Backup oxygen needed next watch.</p>}
+          {forecast.missedMeal ? <p className="decision-danger">No meals left. This ends the shift.</p>
+            : forecast.oxygen === 0 || forecast.exposure === capacity.exposure ? <p className="decision-danger">This hits a safety limit and ends the shift.</p>
               : forecast.food === 0 && forecast.node !== 'report' && <p className="decision-danger">
-                {harvestCount(forecast) ? 'Last meal. Harvest before the next watch ends.' : 'Last meal and no ripe crops. The crew may have to end the shift.'}
+                {harvestCount(forecast) ? 'Harvest at the next stop.' : 'No meals or ripe crops for the next stop.'}
               </p>}
         </>}
         {weakSignal && <p className="decision-danger">Weak signal. Earth will miss this message at this setting.</p>}
         <button className="primary" disabled={forecast === state} onClick={() => onCommit({ choice: original, bed, settings })}>
-          {(choice.greenhouse || choice.harvest) && site !== 'garden' ? 'Go to greenhouse' : weakSignal ? 'Send anyway' : 'Apply plan'} <Icon name="arrow" size={18} />
+          {(choice.greenhouse || choice.harvest) && site !== 'garden' ? 'Go to greenhouse' : isRoverRoute(choice.id) ? 'Drive this route' : weakSignal ? 'Send anyway' : 'Apply plan'} <Icon name="arrow" size={18} />
         </button>
-        <details><summary>Plan details</summary><p>{choice.detail} Forecast includes sunlight, life support, and one meal per watch.</p></details>
+        {site !== 'rover' && <details><summary>Plan details</summary><p>{choice.detail} The crew uses one meal each watch.</p></details>}
     </div>}
-    {site === 'garden' && <Greenhouse state={state} next={forecast} bed={bed}
-      selectBed={(value) => { if (original) select(original, value, settings); else setBed(value) }} />}
     {extra}
   </section>
 }

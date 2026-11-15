@@ -144,7 +144,10 @@ export function LunarScene({ state, demo = false, onInteract, onOverview, onUnav
         )}
       </div>}
       <div className="world-toolbar">
-        {!state.locked && <div className="world-controls"><span><kbd>WASD</kbd> Move</span><span>Drag to look</span><span>Tap ground to walk</span></div>}
+        {!expedition?.descent && <div className="world-controls">
+          {!state.locked && <span><kbd>WASD</kbd> Move</span>}<span>Drag to look</span>
+          {!state.locked && <span>Tap ground to walk</span>}
+        </div>}
         <div className="world-tools">
           {!flight && <button className="world-button" data-active={state.overview} onClick={onOverview}><Icon name="globe" size={17} />{state.overview ? 'Cadet view' : 'Colony view'}</button>}
           {document.fullscreenEnabled && <button className="icon-button world-button" aria-label={full ? 'Exit fullscreen' : 'Play fullscreen'} onClick={() => void fullscreen()}>

@@ -2,27 +2,33 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { briefings, capacity, choose, colonyFrame, harvestCount, installationCost, landingSites, modules, options, setupPower, startColony, sunlight, tuneChoice } from '../colony'
 import type { Colony, LandingSite, Layout, Reading, StationChoice } from '../colony'
-import { radio, storm } from '../science'
+import { radio } from '../science'
+import { crew } from '../mission'
+import type { CrewId } from '../mission'
 import { moduleSites, sites } from '../world/layout'
 import type { SiteId } from '../world/layout'
 import type { ShelterPhase, WorkVisual, WorldState } from '../world/runtime'
-import photo from '../art/apollo-11.webp'
 import { Icon } from './Icon'
-import { asset, Avatar } from './Shared'
+import { Avatar } from './Shared'
 import { StationLab } from './StationLab'
 import type { Draft } from './StationLab'
+import { ColonyReport } from './ColonyReport'
+import { stationEvidence, StationEvidence } from './StationEvidence'
 import './colony.css'
 
 const LunarScene = lazy(() => import('../LunarScene').then((module) => ({ default: module.LunarScene })))
 const decisionSites: Record<Colony['node'], SiteId> = {
   budget: 'power', warning: 'radio', shelter: 'shelter', relay: 'rover',
-  research: 'kit', repair: 'air', handover: 'radio', report: 'lander',
+  research: 'rover', repair: 'air', handover: 'radio', report: 'lander',
 }
-const workSites: Record<string, SiteId> = { hide: 'shelter', walk: 'kit' }
+const workSites: Record<string, SiteId> = { hide: 'shelter', walk: 'kit', sample: 'kit' }
+const stationCrew: Record<SiteId, CrewId> = { lander: 'pip', rover: 'pip', kit: 'pip', garden: 'jo', air: 'mira', power: 'mira', shelter: 'mira', radio: 'ren' }
+const buildDuration = 5200
 const visuals: Record<string, WorkVisual> = {
   reserve: { light: 0, pulse: 'power' }, 'service-array': { pulse: 'power' },
   hide: { pose: 'rest' }, warn: { bearing: 72 }, pods: { pods: 2 }, stock: { pose: 'rest', pulse: 'oxygen' },
   drive: { roverStops: ['kit', 'shelter'] }, 'ridge-drive': { roverStops: ['ridge', 'kit', 'shelter'] },
+  'sample-drive': { roverStops: ['kit', 'shelter'] }, 'sample-ridge': { roverStops: ['ridge', 'kit', 'shelter'] },
   walk: { pose: 'carry' }, sample: { pose: 'sample' }, scan: { pulse: 'power' },
   refill: { pulse: 'oxygen' }, 'top-up': { pulse: 'oxygen' }, 'reserve-air': { pulse: 'oxygen' },
   'one-pod': { pods: 1 }, 'safe-mode': { pose: 'rest' },
@@ -36,7 +42,7 @@ function workFor(state: Colony, draft: Draft): WorkVisual {
   if (choice.transmit) return { bearing: draft.settings.bearing }
   if (choice.id === 'pods') return { pods: draft.settings.level ?? 2 }
   if (choice.id === 'refill') return { pulse: 'oxygen' }
-  if (visuals[choice.id]?.roverStops) return { ...visuals[choice.id], roverPower: choice.cost }
+  if (visuals[choice.id]?.roverStops) return { ...visuals[choice.id], roverPower: choice.cost, roverSurvey: state.node === 'research' }
   return visuals[choice.id] ?? {}
 }
 
@@ -47,7 +53,7 @@ const readings = [
   { key: 'exposure', label: 'Exposure', unit: 'lower is safer', icon: 'shield', color: 'coral' },
 ] as const
 type Job = { id: string; title: string; site: SiteId; next: Colony; work: WorkVisual; draft?: Draft; transmit?: boolean }
-type Activity = { label: string; work: WorkVisual; sending: boolean }
+type Activity = { label: string; work: WorkVisual; sending: boolean; duration?: number; building?: boolean }
 type Placements = [boolean | null, boolean | null, boolean | null]
 const signed = (value: number) => value > 0 ? '+' + value : value < 0 ? '−' + Math.abs(value) : '0'
 
@@ -87,25 +93,8 @@ function Consequences({ before, after }: { before: Colony; after: Colony }) {
   </span>
 }
 
-function FlightLog({ state, onRetry }: { state: Colony; onRetry: () => void }) {
-  const unsafe = state.oxygen === 0 || state.exposure >= capacity.exposure || state.missedMeal
-  return <>
-    <h2>{unsafe ? 'Mission Control called the crew inside' : state.log.at(-1)?.title === 'End the shift early' ? 'The crew ended the shift early' : 'Shift complete'}</h2>
-    <ul className="goal-list">
-      <li><Icon name="air" />{state.oxygen ? state.oxygen + ' oxygen ready for the next crew' : 'Oxygen reserve exhausted'}</li>
-      <li><Icon name="shield" />{state.exposure < capacity.exposure ? 'Crew below the exposure limit' : 'Exposure limit reached'}</li>
-      <li><Icon name="food" />{state.missedMeal ? 'Food ran out before the crew could eat' : `${state.food} food left for the next watch`}</li>
-      <li><Icon name="plant" />{harvestCount(state)} of {state.plants.length} lettuce plants ready to harvest</li>
-      <li><Icon name="radio" />{state.contact ? 'Earth received your message' : 'Earth is still waiting for an update'}</li>
-      <li><Icon name="target" />{state.research ? 'Rock sample collected' : state.scanned ? 'Surface scan recorded' : 'Rock sample left on the surface'}</li>
-    </ul>
-    <details><summary>Review your decisions</summary><ol>{state.log.map(({ title, detail }, i) => <li key={i}><strong>{title}</strong><p>{detail}</p></li>)}</ol></details>
-    <button className="primary" onClick={onRetry}>Land again <Icon name="rewind" /></button>
-  </>
-}
-
 export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit: () => void; cue: (good: boolean) => void; sound: boolean; onSound: () => void; paused: boolean }) {
-  const [stage, setStage] = useState<'film' | 'site' | 'landing' | 'build' | 'play'>('film')
+  const [stage, setStage] = useState<'site' | 'landing' | 'build' | 'play'>('site')
   const [site, setSite] = useState<LandingSite>('ridge')
   const [layout, setLayout] = useState<Placements>([null, null, null])
   const [part, setPart] = useState(0)
@@ -114,6 +103,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
   const [setupResult, setSetupResult] = useState('')
   const [queued, setQueued] = useState<Job | null>(null)
   const [activity, setActivity] = useState<Activity | null>(null)
+  const [evidence, setEvidence] = useState<SiteId | null>(null)
   const [finishedJob, setFinishedJob] = useState<Job | null>(null)
   const [draftWork, setDraftWork] = useState<WorkVisual>({})
   const [inspecting, setInspecting] = useState<SiteId | null>(null)
@@ -145,6 +135,8 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
   const report = state?.node === 'report'
   const module = modules[part]
   const objective = queued?.site ?? (state ? (report ? lastSite.current : decisionSites[state.node]) : stage === 'build' ? moduleSites[part] : 'lander')
+  const guide = stationCrew[inspecting ?? (feedback ? lastSite.current : objective)]
+  const topic = stationEvidence(inspecting ?? objective, state?.node === 'warning')
   const previewMount = stage === 'build' && occupied && !activity && !setupResult ? hoverMount ?? mount : null
   const routeOptions = state ? options(state) : []
   const earlyShelter = !occupied && !queued && !unavailable && routeOptions.find((choice) => choice.id === 'hide')
@@ -154,31 +146,32 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
     return (!choice.greenhouse || choice.id === 'grow') && choice.id !== 'one-pod' && choice.id !== 'top-up'
   })
   const title = stage === 'site' ? 'Choose where to land' : stage === 'landing' ? 'Descending to ' + landingSites[site].name
-    : stage === 'build' ? 'Build Farpoint' : state ? briefings[state.node].title : 'The Moon, up close'
+    : stage === 'build' ? 'Build Farpoint' : state ? briefings[state.node].title : 'Farpoint outpost'
   const sceneState: WorldState = {
     site: inspecting ?? (activity?.work.shelterRun ? 'shelter' : feedback ? lastSite.current : objective), turn: state?.watch ?? -1,
-    light: frame.sunlit, storm: stormActive, crew: 'pip',
+    light: frame.sunlit, storm: stormActive, crew: guide,
     work: activity?.work ?? (feedback && finishedJob && !finishedJob.work.roverStops ? finishedJob.work : draftWork),
-    opened: occupied || !!inspecting, locked: stage === 'site' || stage === 'landing' || occupied || !!inspecting || !!activity || !!report || paused,
+    opened: occupied || !!inspecting, locked: stage === 'site' || stage === 'landing' || occupied || !!inspecting || !!activity || !!report || paused || !!evidence,
     completed: feedback && finishedJob ? finishedJob.draft?.choice.greenhouse || finishedJob.id === 'harvest' ? 'garden' : completedIds[finishedJob.id] : undefined,
     kit, garden: displayed?.crop ?? 0, sending: !!activity?.sending, overview,
     expedition: { sector: site, recon: stage === 'site', descent: stage === 'landing', layout,
       sampleCollected: !!displayed?.research, plants: (displayed ?? seed).plants,
       pending: pendingMount === null ? undefined : { part, outer: pendingMount },
+      building: activity?.building ? part : undefined,
       preview: previewMount === null ? undefined : { part, outer: previewMount },
       focusModule: stage === 'build' && occupied ? part : undefined },
   }
-  const prompt = setupResult || feedback ? 'Take a look at what changed. I’ll mark the next stop when you’re ready.'
-    : inspecting ? 'Take a look at this station, then I’ll point you back to our waypoint.'
-    : queued ? occupied ? 'We’re here. Compare the controls and apply the plan when you’re ready.'
-      : 'Head to the marked station and operate it to carry out your choice.'
-    : stage === 'site' ? 'I’m Pip, your guide. Survey both landing zones. Pick where you want us to touch down.'
+  const prompt = setupResult || feedback ? 'Check what changed, then head to the next stop.'
+    : inspecting ? 'Look around this station. Return to the waypoint when ready.'
+    : queued ? occupied ? 'Set your controls and confirm.'
+      : 'Follow the marker, then press E or tap Operate.'
+    : stage === 'site' ? 'Pick a landing zone. After touchdown, move the yellow cadet with WASD, arrows, or touch.'
     : stage === 'landing' ? 'Landing gear down. Hold tight.'
-    : stage === 'build' ? pendingMount === null ? 'Pick a mount for our ' + module.name.toLowerCase() + '.'
-      : 'Follow the marker to the mount. Press E or tap Build when you get there.'
+    : stage === 'build' ? pendingMount === null ? 'Pick a mount for the ' + module.name.toLowerCase() + '.'
+      : 'Follow the marker. Press E or tap Build at the mount.'
     : report ? 'Let’s check what the next crew will inherit.'
     : occupied && state ? briefings[state.node].prompt
-    : 'Follow the ground arrows to the ' + sites[objective].name.toLowerCase() + ', then press E or tap Operate.';
+    : 'Follow the marker to ' + sites[objective].name + '. Press E or tap Operate.'
 
   useEffect(() => {
     if (incoming && !alerted.current) cue(false)
@@ -200,12 +193,13 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
 
   function animate(activity: Activity, callback: () => void, duration: number) {
     if (finishWork.current) return
-    setActivity(activity)
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const actualDuration = !activity.sending && !activity.work.roverStops && !activity.work.shelterRun && reduced ? Math.min(duration, 450) : duration
+    setActivity({ ...activity, duration: actualDuration })
     setOverview(false)
     viewport()
     finishWork.current = callback
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    timer.current = window.setTimeout(complete, !activity.sending && !activity.work.roverStops && !activity.work.shelterRun && reduced ? Math.min(duration, 450) : duration)
+    timer.current = window.setTimeout(complete, actualDuration)
   }
 
   function execute(job: Job) {
@@ -217,7 +211,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
       setFeedback(job.next)
       setQueued(null)
       setShelterPhase(null)
-      if (job.id === 'walk' || visual.roverStops) setKit(true)
+      if (job.id === 'walk' || job.id === 'drive' || job.id === 'ridge-drive') setKit(true)
       const delta = job.next.log.at(-1)!.delta
       for (const key of Object.keys(delta) as Reading[]) {
         if (delta[key]) cue(key === 'exposure' ? delta[key] < 0 : delta[key] > 0)
@@ -230,7 +224,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
     }
     if (stormWatch && (job.id === 'hide' || job.id === 'stock' || job.id === 'safe-mode')) takeShelter()
     else animate({ label: job.title, work: { ...visual, working: true }, sending: !!job.transmit }, stormWatch ? takeShelter : finish,
-      job.transmit ? radio.roundTripMs : visual.roverStops ? 18000 : 1500)
+      job.transmit ? radio.roundTripMs : visual.roverStops ? 22000 : 3000)
   }
 
   function plan(draft?: Draft) {
@@ -253,7 +247,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
   }
 
   function interact(id: SiteId) {
-    if (occupied || inspecting || report || paused || stage === 'site' || stage === 'landing') return
+    if (occupied || inspecting || report || paused || evidence || stage === 'site' || stage === 'landing') return
     if (id !== objective) {
       setInspecting(id)
       setOverview(false)
@@ -278,10 +272,10 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
     setLayout(placed)
     setPendingMount(null)
     setHoverMount(null)
-    animate({ label: 'Installing ' + module.name.toLowerCase(), work: { working: true, pulse: 'power' }, sending: false }, () => {
+    animate({ label: 'Installing ' + module.name.toLowerCase(), work: { working: true, pulse: 'power' }, sending: false, building: true }, () => {
       setSetupResult(module.name + ' installed')
       cue(true)
-    }, 1600)
+    }, buildDuration)
   }
 
   function nextModule() {
@@ -319,6 +313,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
     setPendingMount(null)
     setHoverMount(null)
     setInspecting(null)
+    setEvidence(null)
     setUnavailable(false)
     setRun((current) => current + 1)
     viewport()
@@ -326,22 +321,15 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
 
   const frameLabel = frame.sunlit ? 'Sunlight · +' + sunlight(state ?? seed) + ' solar power' : 'Lunar shadow · 0 solar power'
 
+  if (report && state) return <ColonyReport state={state} onRetry={retry} onExit={onExit} />
+
   return <section className="colony game-wrap content-width">
     <div className="colony-heading">
       <button className="text-button" onClick={onExit}><Icon name="back" size={16} />Launch screen</button>
       <p className="eyebrow">{state ? landingSites[site].name + ' / Watch ' + Math.min(state.watch + 1, 5) : 'Farpoint / Arrival'}</p>
       <h1>{title}</h1>
     </div>
-    {stage === 'film' ? <div className="landing-film glass-panel">
-      <video src={asset('apollo-touchdown.mp4')} poster={photo} muted playsInline controls preload="metadata"
-        autoPlay={!window.matchMedia('(prefers-reduced-motion: reduce)').matches} aria-label="Silent Apollo 11 archival descent footage from the Lunar Module window" />
-      <div className="film-caption"><p>Apollo 11 landed in 1969. Your crew is approaching Farpoint, a training outpost near the Moon’s South Pole.</p>
-        <a href="https://www.nasa.gov/wp-content/uploads/static/history/alsj/a11/a11.landmov.html" target="_blank" rel="noreferrer">NASA Apollo 11 film · Digitized by Gary Neff</a></div>
-      <div className="colony-actions">
-        <button className="primary" onClick={() => { setStage('site'); cue(true) }}>Survey landing sites <Icon name="arrow" /></button>
-        <button className="secondary" aria-pressed={sound} onClick={onSound}><Icon name={sound ? 'sound' : 'mute'} />Game sound</button>
-      </div>
-    </div> : <>
+    <>
       {(displayed || stage === 'build') && <Resources state={displayed ?? { ...seed, power: setupBalance }} feedback={!!feedback} />}
       <div className="campaign-grid">
         <div>
@@ -353,6 +341,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
                 onShelterPhase={(phase) => { if (phase === 'complete') complete(); else setShelterPhase(phase) }}
                 onTouchdown={() => { setStage('build'); setOccupied(true); cue(true) }} />
             </Suspense> : <div className="world-placeholder"><p>This mission needs WebGL 2 to render the outpost.</p><button className="secondary" onClick={() => { setUnavailable(false); setRun(run + 1) }}>Retry 3D view</button></div>}
+            {stage === 'site' && <div className="survey-label"><Icon name="target" size={19} /><span>Landing survey</span><strong>{landingSites[site].name}</strong></div>}
             {stormStatus && <div className="storm-banner" data-phase={stormStatus} role={incoming ? 'alert' : 'status'}>
               <Icon name={stormStatus === 'clear' ? 'check' : stormStatus === 'inside' ? 'shield' : 'storm'} size={23} />
               <strong>{stormStatus === 'clear' ? 'Storm front passed' : stormStatus === 'inside' ? 'Hatch sealed · Ride it out' : stormStatus === 'approach' ? 'Crew heading to shelter' : 'Storm incoming'}</strong>
@@ -363,7 +352,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
               {!activity && <button className="world-button" onClick={() => station.current?.scrollIntoView({ block: 'nearest' })}>View result</button>}
             </div>}
             {previewMount !== null && <div className="world-action-status">
-              <Icon name="target" size={19} /><span role="status">Preview · {previewMount ? module.far : module.near}</span>
+              <Icon name="target" size={19} /><span role="status">Proposed mount · {previewMount ? module.far : module.near}</span>
               <button className="world-button placement-return" onClick={() => station.current?.scrollIntoView({ block: 'nearest' })}>Station controls</button>
             </div>}
           </div>
@@ -372,13 +361,25 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
             <a href="https://svs.gsfc.nasa.gov/4930/" target="_blank" rel="noreferrer">NASA model · Frame {frame.frame}</a>
           </div>
         </div>
-        <div className="glass-panel colony-panel campaign-station" ref={station} tabIndex={-1} role="region" aria-label="Pip’s station controls">
-          <div className="pip-guide"><Avatar id="pip" /><div><strong>Pip</strong><p>{activity ? (activity.sending ? 'Hold here. The signal has to travel to Earth and back.' : 'Watch the outpost. We’re carrying out your choice.') : prompt}</p></div></div>
+        <div className="glass-panel colony-panel campaign-station" ref={station} tabIndex={-1} role="region" aria-label={crew[guide].name + '’s station controls'}>
+          <div className="pip-guide" key={guide} data-crew={guide}>
+            <Avatar id={guide} /><div><span className="crew-on-comms">On comms</span><strong>{crew[guide].name}</strong><small>{crew[guide].role}</small>
+              <p aria-live="polite">{activity ? (activity.sending ? 'The signal is travelling to Earth and back.' : 'Watch the outpost. We’re carrying out your choice.') : prompt}</p></div>
+          </div>
+          {!activity && !feedback && stage !== 'landing' && <aside className="evidence-prompt" key={topic.title} aria-label="NASA field note">
+            <button className="evidence-trigger text-button" onClick={() => setEvidence(inspecting ?? objective)}>
+              <Icon name="book" size={18} /><span><small>NASA field note</small><b>{topic.title}</b></span>
+              <strong>View <Icon name="arrow" size={15} /></strong>
+            </button>
+          </aside>}
           {inspecting ? <StationLab key={inspecting} state={state ?? seed} site={inspecting} choices={[]}
             onPreview={() => undefined} onCommit={() => undefined}
             extra={<button className="secondary" onClick={() => { setInspecting(null); viewport() }}>Back to waypoint</button>} />
-            : report && state ? <FlightLog state={state} onRetry={retry} />
-            : activity ? <div role="status"><h2>{activity.label}</h2>{activity.sending && <div className="radio-track"><i /></div>}</div>
+            : activity ? <div className="activity-panel" role="status">
+              <h2>{activity.label}</h2>
+              <div className="activity-track" aria-hidden="true" style={{ '--duration': activity.duration + 'ms' } as CSSProperties}><i /></div>
+              <p>{activity.building ? 'Footings → assembly → system check' : activity.work.roverStops ? 'Follow Pip’s rover in the field view.' : 'The crew is at work.'}</p>
+            </div>
             : setupResult ? <><h2>{setupResult}</h2><p className="watch-cost"><Icon name="battery" size={18} /> −{installationCost(part, !!layout[part])} battery</p><button className="primary" onClick={nextModule}>Next waypoint <Icon name="arrow" /></button></>
             : feedback && state ? <>
               <div className="choice-result" role="status"><h2>{feedback.log.at(-1)?.title}</h2><p>{feedback.log.at(-1)?.detail}</p>
@@ -397,7 +398,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
                 </button>)}
             </div><button className="primary" disabled={unavailable} onClick={() => { setStage('landing'); viewport(); cue(true) }}>
               Land at {landingSites[site].name} <Icon name="arrow" />
-            </button></>
+            </button><button className="text-button" aria-pressed={sound} onClick={onSound}><Icon name={sound ? 'sound' : 'mute'} />Game sound</button></>
             : stage === 'landing' ? <h2 role="status">Landing at {landingSites[site].name}…</h2>
             : pendingMount !== null ? <><h2>{pendingMount ? module.far : module.near}</h2>
               <p className="watch-cost"><Icon name="battery" size={18} /> −{installationCost(part, pendingMount)} battery at installation</p>
@@ -409,7 +410,7 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
               </button>}</>
             : stage === 'build' ? <>
               <h2>Install the {module.name.toLowerCase()}</h2>
-              <p>Preview both mounts. Choose where to build, then head there to install it.</p>
+              <p>Pick a mount, then follow its marker to build.</p>
               <div className="choice-list">
                 {[false, true].map((outer) => <button className="decision-card" key={String(outer)} aria-pressed={mount === outer}
                   onMouseEnter={() => setHoverMount(outer)} onMouseLeave={() => setHoverMount(null)}
@@ -429,17 +430,20 @@ export function ColonyMission({ onExit, cue, sound, onSound, paused }: { onExit:
               }}>Head to selected mount <Icon name="arrow" /></button>
             </>
             : state && <>
-              {state.node === 'warning' && <p><a href={storm.url} target="_blank" rel="noreferrer">Archived DONKI event</a> · Exposure uses game points.</p>}
               <StationLab key={state.watch + ':' + objective} state={state} site={objective} choices={stationOptions} initialDraft={queued?.draft}
                 onPreview={(draft) => {
                   const work = workFor(state, draft)
-                  setDraftWork({ light: objective === 'garden' ? work.light : undefined, bearing: work.bearing, pods: work.pods })
+                  setDraftWork({ light: objective === 'garden' ? work.light : undefined, bearing: work.bearing, pods: work.pods, routePreview: work.roverStops })
                 }} onCommit={plan}
                 extra={queued ? <button className="text-button" onClick={() => { setQueued(null); setOccupied(false); setDraftWork({}); viewport() }}>Change destination</button>
-                  : <button className="text-button" onClick={() => plan()}>End the shift early</button>} />
+                  : <div className="station-extras">
+                    <button className="text-button" onClick={() => { setOccupied(false); setDraftWork({}); viewport() }}>Look around</button>
+                    <button className="text-button" onClick={() => plan()}>End shift</button>
+                  </div>} />
             </>}
         </div>
       </div>
-    </>}
+    </>
+    {evidence && <StationEvidence site={evidence} frame={frame} stormWarning={state?.node === 'warning'} onClose={() => setEvidence(null)} />}
   </section>
 }

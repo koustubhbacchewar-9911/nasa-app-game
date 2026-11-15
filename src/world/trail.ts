@@ -1,6 +1,6 @@
 import * as T from 'three'
 
-export function createTrail(scene: T.Scene, heightAt: (x: number, z: number) => number) {
+export function createTrail(scene: T.Scene, heightAt: (x: number, z: number) => number, opacity = .84) {
   const shape = new T.Shape()
   shape.moveTo(-.42, -.24)
   shape.lineTo(0, .22)
@@ -10,7 +10,7 @@ export function createTrail(scene: T.Scene, heightAt: (x: number, z: number) => 
   shape.lineTo(-.42, .02)
   shape.closePath()
   const geometry = new T.ShapeGeometry(shape).rotateX(-Math.PI / 2)
-  const material = new T.MeshBasicMaterial({ color: '#a9f5ff', transparent: true, opacity: .84, depthWrite: false, toneMapped: false })
+  const material = new T.MeshBasicMaterial({ color: '#a9f5ff', transparent: true, opacity, depthWrite: false, toneMapped: false })
   const limit = 64
   const arrows = new T.InstancedMesh(geometry, material, limit)
   arrows.instanceMatrix.setUsage(T.DynamicDrawUsage)

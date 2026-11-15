@@ -36,12 +36,12 @@
   padding: .32rem .25rem;
   border: 1px solid var(--line-strong);
   border-radius: .5rem;
-  background: #2b261f;
+  background: #152238;
   font: 600 .82rem var(--mono);
   transition: border-color var(--response) var(--ease), background-color var(--response) var(--ease);
 }
 .turn-tabs button:hover:not(:disabled) { border-color: var(--sage); }
-.turn-tabs button[aria-pressed="true"] { border-color: var(--sage); background: #443d33; }
+.turn-tabs button[aria-pressed="true"] { border-color: var(--sage); background: #203d3c; }
 .turn-tabs button svg { color: var(--sage); }
 .turn-tabs .lit-turn svg { color: var(--amber); }
 .timeline-entry {
@@ -80,7 +80,7 @@
   background: #ffffff08;
   padding: .85rem;
 }
-.replay-comparison > div:last-child { border-color: #becba572; background: #becba50b; }
+.replay-comparison > div:last-child { border-color: #5d9f8899; background: #a4f1ce12; }
 .replay-comparison p { margin-top: .8rem; }
 .replay-comparison p strong { color: var(--moon); }
 

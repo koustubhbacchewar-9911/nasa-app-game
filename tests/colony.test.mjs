@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { choose, colonyFrame, harvestCount, installationCost, panelOutput, setupPower, startColony, sunlight } from '../src/colony.ts'
+import { choose, colonyFrame, harvestCount, installationCost, panelOutput, rateOutpost, setupPower, startColony, sunlight } from '../src/colony.ts'
 import { canWalk, expeditionBarriers, expeditionSites, moduleMount, moduleSites, sectors } from '../src/world/layout.ts'
 
 test('landing time and solar placement change available energy', () => {
@@ -66,6 +66,21 @@ test('early contact creates a relay rescue, and a longer return trades safety fo
   assert.ok(walking.exposure > driving.exposure)
 })
 
+test('the post-storm rover routes trade battery for a terrain survey', () => {
+  const start = startColony('ridge', [false, false, false])
+  const survey = ['reserve', 'hide', 'pods'].reduce(choose, start)
+  const direct = choose(survey, 'sample-drive')
+  const ridge = choose(survey, 'sample-ridge')
+  assert.equal(direct.node, 'handover')
+  assert.equal(ridge.node, 'handover')
+  assert.equal(direct.research, true)
+  assert.equal(ridge.research, true)
+  assert.equal(direct.scanned, false)
+  assert.equal(ridge.scanned, true)
+  assert.equal(direct.power - ridge.power, 2)
+  assert.equal(direct.oxygen, ridge.oxygen)
+})
+
 test('power starvation uses oxygen and the crew can end a shift early', () => {
   const stranded = { ...startColony('basin', [false, false, false]), node: 'handover', watch: 2, power: 0 }
   assert.equal(choose(stranded, 'earth'), stranded)
@@ -124,12 +139,26 @@ test('the crew eats every watch, a harvest replenishes food, and a missed meal e
   assert.equal(grown.food, base.food - 1)
   const shelter = choose(choose(grown, 'hide'), 'pods')
   const harvest = choose(shelter, 'harvest')
-  assert.equal(harvest.food, 4)
+  assert.equal(harvest.food, shelter.food + harvestCount(shelter) * 2 - 1)
   assert.equal(harvestCount(harvest), 0)
-  assert.equal(choose(harvest, 'handover-reserve').food, 3)
+  assert.equal(choose(harvest, 'handover-reserve').food, harvest.food - 1)
   const hungry = choose({ ...shelter, food: 0 }, 'sample')
   assert.equal(hungry.node, 'report')
   assert.equal(hungry.missedMeal, true)
+})
+
+test('full missions can finish with starting rations and earn different ratings', () => {
+  const start = startColony('ridge', [false, false, false])
+  const takeRound = (plan) => plan.reduce((state, id) => choose(state, id), start)
+  const survey = takeRound(['reserve', 'hide', 'pods', 'sample-ridge', 'handover-reserve'])
+  const harvest = takeRound(['grow', 'short-warning', 'pods', 'harvest', 'handover-reserve'])
+  assert.equal(survey.node, 'report')
+  assert.equal(survey.missedMeal, false)
+  assert.equal(harvest.node, 'report')
+  assert.equal(harvest.contact, true)
+  assert.notEqual(rateOutpost(survey).score, rateOutpost(harvest).score)
+  assert.equal(rateOutpost({ ...start, research: true, contact: true }).score, 10)
+  assert.equal(rateOutpost({ ...start, food: 0, missedMeal: true, oxygen: 0, exposure: 5, power: 0 }).score, 0)
 })
 
 test('radio power, aim, and water pods change mission outcomes', () => {

@@ -5,10 +5,10 @@ export const frames = lunar.frames.map((frame) => ({ ...frame, sunlit: frame.sam
 export const samplePoint = { x: (lunar.x - lunar.crop.x) / lunar.crop.width * 100, y: (lunar.y - lunar.crop.y) / lunar.crop.height * 100 }
 
 export const crew = {
-  mira: { name: 'Mira', role: 'Power engineer', line: 'Keeps the solar panels and air machine running.', color: '#f9ca81' },
+  mira: { name: 'Mira', role: 'Power engineer', line: 'Keeps the solar panels and air machine running.', color: '#d0b4ff' },
   jo: { name: 'Dr. Jo', role: 'Plant scientist', line: 'Grows the crew’s first Moon salad.', color: '#aee8b3' },
-  ren: { name: 'Ren', role: 'Radio operator', line: 'Sends messages between the Moon and Earth.', color: '#becba5' },
-  pip: { name: 'Pip', role: 'Rover pilot', line: 'Drives the rover and spots problems outside.', color: '#ffb37e' },
+  ren: { name: 'Ren', role: 'Radio operator', line: 'Sends messages between the Moon and Earth.', color: '#a9dffc' },
+  pip: { name: 'Pip', role: 'Rover pilot', line: 'Drives the rover and spots problems outside.', color: '#ffc46b' },
 }
 
 export type CrewId = keyof typeof crew

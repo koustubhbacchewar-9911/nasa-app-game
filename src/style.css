@@ -283,7 +283,7 @@ input[type="range"] { display: block; width: 100%; min-width: 0; min-height: 44p
   font-size: .8rem;
   font-weight: 650;
 }
-.phase-list li.active { border-color: #becba588; color: var(--moon); background: #373127; }
+.phase-list li.active { border-color: #5d9f88; color: var(--moon); background: #203d3c; }
 .phase-list li.active svg { color: var(--sage); }
 .phase-list li.done svg { color: var(--mint); }
 .telemetry {
@@ -336,14 +336,14 @@ input[type="range"] { display: block; width: 100%; min-width: 0; min-height: 44p
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  background: #1a1713;
+  background: #111a2b;
 }
 .world-placeholder::before, .console-scene::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(110deg, #0f0d0af2 10%, #0f0d0a96 65%, #0f0d0a4d), url("./art/outpost.jpg") center 53% / cover no-repeat;
+  background: linear-gradient(110deg, #10182df2 10%, #10182d96 65%, #10182d4d), url("./art/outpost.jpg") center 53% / cover no-repeat;
   filter: grayscale(1) sepia(.28) hue-rotate(132deg);
 }
 .world-placeholder { display: grid; place-content: center; justify-items: center; gap: .65rem; color: var(--moon); }
@@ -403,11 +403,11 @@ input[type="range"] { display: block; width: 100%; min-width: 0; min-height: 44p
   padding: .7rem .9rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #191713ed;
+  background: #111a2bed;
   text-align: left;
   transition: border-color var(--response), background-color var(--response), transform var(--response) var(--ease);
 }
-.field-reference:hover { border-color: #becba591; background: #2c2720; transform: translateY(-2px); }
+.field-reference:hover { border-color: #5d9f88; background: #203d3c; transform: translateY(-2px); }
 .field-reference strong, .field-reference small { display: block; }
 .field-reference small { margin-top: .2rem; color: var(--muted); font-size: .8rem; }
 .field-reference > svg { color: var(--sage); }
@@ -435,7 +435,7 @@ input[type="range"] { display: block; width: 100%; min-width: 0; min-height: 44p
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
-  background: linear-gradient(90deg, #110f0c 22%, #110f0cf3 43%, #110f0c7e), url("./art/apollo-11.webp") right 27% / cover;
+  background: linear-gradient(90deg, #142239 15%, #142239d9 60%, #14223975), url("./art/outpost.jpg") center / cover;
   animation: panel-arrival var(--arrival) var(--ease) both;
 }
 .report-splash h1 { max-width: 17ch; }

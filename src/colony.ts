@@ -64,19 +64,19 @@ export type PlanSettings = { level?: number; mist?: boolean; bearing?: number }
 export type StationChoice = Choice
 
 export const briefings: Record<Node, { title: string; prompt: string }> = {
-  budget: { title: 'Charge or grow?', prompt: 'The air machine has first claim on the battery. The lettuce is nearly ready. How much power can you risk before the shadow arrives?' },
-  warning: { title: 'Storm incoming', prompt: 'Solar particles are on the way. Warn Earth or head straight to shelter. Every second outside adds exposure.' },
-  shelter: { title: 'Seal the shelter', prompt: 'The first wave passed. Raise water pods or spend spare oxygen waiting out the remaining radiation.' },
-  relay: { title: 'The relay is outside', prompt: 'Earth got your warning. Recover the relay before the next wave. A faster rover uses more power.' },
-  research: { title: 'One chance to collect data', prompt: 'The storm has passed. A short trip could secure a rock sample, but the suit uses oxygen you may need at handover.' },
-  repair: { title: 'The air machine needs attention', prompt: 'If you spend battery to refill the reserve now, there will be less for the call home. You can also stretch the reserve with the backup kit.' },
-  handover: { title: 'Your last call', prompt: 'The next crew needs your status. Decide whether to use the remaining power on an Earth call or finish growing food for the incoming crew.' },
+  budget: { title: 'Charge or grow?', prompt: 'Save battery for oxygen, or use some to grow lettuce.' },
+  warning: { title: 'Storm incoming', prompt: 'Take shelter, or warn Earth before you go.' },
+  shelter: { title: 'Shield the crew', prompt: 'Raise water pods to block radiation. More pods cost more battery.' },
+  relay: { title: 'Recover the relay', prompt: 'Pick a route on the map. Compare battery and exposure.' },
+  research: { title: 'Collect a Moon rock', prompt: 'Pick a route on the map. The ridge adds a survey and costs more battery.' },
+  repair: { title: 'Refill the oxygen', prompt: 'Choose how much battery to spend on backup oxygen.' },
+  handover: { title: 'Hand over the base', prompt: 'Call Earth, harvest food, or leave power for the next crew.' },
   report: { title: 'Flight log', prompt: '' },
 }
 
 export function startColony(site: LandingSite, layout: Layout): Colony {
   return { site, layout, watch: 0, node: 'budget', power: setupPower(site, layout),
-    oxygen: 6, exposure: 0, food: 4, missedMeal: false, crop: 0, contact: false, research: false, scanned: false, arrayBonus: 0,
+    oxygen: 6, exposure: 0, food: 5, missedMeal: false, crop: 0, contact: false, research: false, scanned: false, arrayBonus: 0,
     plants: [{ health: 5, growth: 3 }, { health: 4, growth: 2 }, { health: 4, growth: 3 },
       { health: 2, growth: 3 }, { health: 3, growth: 4 }, { health: 2, growth: 4 }], log: [] }
 }
@@ -96,6 +96,18 @@ export function panelOutput(state: Colony) {
 
 export function harvestCount(state: Colony) {
   return state.plants.filter(({ health, growth }) => health >= 3 && growth === plantLimit).length
+}
+
+export function rateOutpost(state: Colony) {
+  const criteria = [
+    { label: 'Oxygen', points: state.oxygen >= 4 ? 2 : Number(state.oxygen > 0), max: 2 },
+    { label: 'Radiation protection', points: state.exposure <= 1 ? 2 : Number(state.exposure < capacity.exposure), max: 2 },
+    { label: 'Food', points: state.missedMeal ? 0 : state.food > 0 || harvestCount(state) > 0 ? 2 : 1, max: 2 },
+    { label: 'Battery', points: state.power >= 5 ? 2 : Number(state.power > 0), max: 2 },
+    { label: 'Earth contact', points: Number(state.contact), max: 1 },
+    { label: 'Field science', points: Number(state.research || state.scanned), max: 1 },
+  ]
+  return { criteria, score: criteria.reduce((total, item) => total + item.points, 0) }
 }
 
 const greenhouse = (state: Colony, next: Node): Choice[] => [
@@ -131,8 +143,9 @@ export function options(state: Colony): Choice[] {
       { id: 'ridge-drive', title: 'Cross the ridge by rover', detail: 'The ridge route uses extra power. At full throttle the crew gains no exposure on the trip.', next: 'research', cost: 5 },
     ]
     case 'research': return [
-      { id: 'sample', title: 'Collect a rock sample', detail: 'Use 2 oxygen and 1 battery to secure a sample for the next crew.', next: 'handover', cost: 1, oxygen: -2, research: true },
-      { id: 'scan', title: 'Scan from cover', detail: 'Use 2 battery to record the rock from a distance. Your suit oxygen stays in reserve.', next: 'handover', cost: 2, scan: true },
+      { id: 'sample-drive', title: 'Direct trail', detail: 'Bring back a rock sample.', next: 'handover', cost: 2, research: true },
+      { id: 'sample-ridge', title: 'Ridge trail', detail: 'Bring back a rock sample and survey the ridge.', next: 'handover', cost: 4, research: true, scan: true },
+      { id: 'sample', title: 'Collect the sample on foot', detail: 'Use 2 oxygen and 1 battery to secure a sample for the next crew.', next: 'handover', cost: 1, oxygen: -2, research: true },
       ...greenhouse(state, 'handover'),
     ]
     case 'repair': return [
@@ -155,6 +168,7 @@ export function planControl(choice: Choice) {
   if (choice.service) return { label: 'Maintenance power', min: 1, max: 3, value: choice.cost, unit: 'battery' }
   if (choice.id === 'pods') return { label: 'Water pods to raise', min: 0, max: 2, value: 2, unit: 'pods' }
   if (choice.id === 'drive' || choice.id === 'ridge-drive') return { label: 'Rover drive power', min: choice.id === 'drive' ? 1 : 3, max: choice.id === 'drive' ? 3 : 5, value: choice.cost, unit: 'battery' }
+  if (choice.id === 'sample-drive' || choice.id === 'sample-ridge') return { label: 'Rover drive power', min: choice.cost, max: choice.cost + 1, value: choice.cost, unit: 'battery' }
   if (choice.id === 'refill') return { label: 'Refill power', min: 1, max: 5, value: choice.cost, unit: 'battery' }
 }
 
@@ -186,6 +200,7 @@ export function tuneChoice(state: Colony, choice: Choice, settings: PlanSettings
   if (choice.id === 'pods') return { ...choice, cost: [0, 2, 3][level],
     oxygen: level === 0 ? -1 : 0, exposure: Math.max(0, 2 - level - cover) }
   if (choice.id === 'refill') return { ...choice, cost: level, oxygen: level }
+  if (choice.id === 'sample-drive' || choice.id === 'sample-ridge') return { ...choice, cost: level }
   return { ...choice, cost: level, exposure: Math.max(0, (choice.id === 'ridge-drive' ? 5 : 4) - level - cover),
     next: level < 3 ? 'repair' : choice.next }
 }

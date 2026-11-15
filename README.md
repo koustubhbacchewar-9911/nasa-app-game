@@ -1,20 +1,20 @@
-# Shadow Shift
+# Lunar Outpost
 
 A browser adventure for ages 7–12 built for the **2026 NASA Space Apps Challenge, Build a Junior Astronaut Mission Trainer**. Place equipment at a fictional lunar South Pole outpost, then use the crew’s battery and oxygen reserves to survive the shadow and plan the handover.
 
 ## Play
 
-- Start Mission opens the Apollo 11 descent film, then lets you survey two modeled landing zones before committing. The lander touches down at your chosen pad. Pip guides you through building and running the 3D outpost.
+- Start Mission opens a guided 3D survey of two landing zones. The lander touches down at your chosen pad. Pip introduces the controls, and each crew specialist guides their own station. Select **View** on a NASA field note to open material related to that task, such as the Apollo 11 descent film during the landing survey.
 - Hover, focus or tap a mount to preview it in the 3D world. Every installation uses battery, with a surcharge for distant mounts. Follow the surface arrows to the mount or use Follow Marker, then press E or tap Build. The machine and its console stay at that location.
 - In the expedition campaign, the crew eats one ration per completed watch. Budget grow-light power and misting for each bed, then harvest mature lettuce to replenish food. Station forecasts account for sunlight, life support, food and your selected plan. The slider values and rations are training units, and the crew eats on mission time.
 - The solar alert warns you before the radiation wave arrives. If you transmit, the result depends on antenna aim and power. After taking cover or sending a warning, watch the cadet cross the surface, enter the shelter and emerge after the wave passes.
-- Explore the 3D outpost opens the six-turn training shift. Move with WASD, arrow keys or touch controls. Drag the scene to turn the camera and press E near the highlighted equipment. Tap the ground to walk there, or use Follow Marker to take the marked path. Colony View raises the camera to show the entire base.
-- Choose **Use console mode** at any objective to go straight to the mission tools. The console also opens automatically when WebGL is unavailable.
-- Set the greenhouse dimmer within the battery budget, trace a rover route, place water pods over gaps in the shield, and align the antenna and assemble a status message. Full lighting consumes more power, rover shortcuts cost power and reduce exposure, and the spare cell from Pip’s kit can power the call.
+- Move the yellow-suited cadet with WASD, arrow keys or touch controls. Drag the scene to turn the camera and press E near the highlighted equipment. Tap the ground to walk there, or use Follow Marker to take the marked path. Colony View raises the camera to show the entire base.
+- Select the direct or ridge trail on the rover map, set drive power, and watch the rover follow your route in 3D. The ridge trail adds survey data at a higher battery cost.
+- The campaign debrief rates the outpost out of 10 and summarizes crew safety, reserves, Earth contact and field science.
 - Judge Demo jumps to the last sunlit turn. The debrief shows each turn and lets you change the greenhouse schedule and replay the same follow-up jobs.
 - Use a pointer, touch or keyboard. The speaker button enables the original synth background music and effects. The music grows more urgent during the storm and settles at mission handover. The game supports reduced motion.
 - The 3D terrain and equipment are fictional models. NASA’s illumination frames are available in the evidence viewer.
-- The 3D world uses Three.js and WebGL 2. If graphics are unavailable, the browser can still run the mission tools.
+- The 3D campaign requires WebGL 2. Judge Demo also offers a console mode.
 
 ## Run locally
 
