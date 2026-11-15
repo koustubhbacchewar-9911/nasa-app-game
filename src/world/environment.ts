@@ -1,6 +1,6 @@
 import * as T from 'three'
 import { box, mesh, metal, sphere } from './models'
-import { sites, spawn } from './layout'
+import { expeditionFoundations, sites, spawn } from './layout'
 
 export function randomSeed(seed: number) {
   return () => {
@@ -10,12 +10,28 @@ export function randomSeed(seed: number) {
 }
 
 const craters = [[-28, -10, 7, 1.9], [28, 10, 8, 2.3], [-12, 34, 10, 1.5], [21, -31, 8, 2.4], [0, -47, 15, 3], [-42, -33, 10, 3]]
-export function elevation(x: number, z: number) {
+function expeditionRelief(x: number, z: number) {
+  const ridge = 4.3 * Math.exp(-(((x + 17) / 6.3) ** 2 + ((z + 8) / 10) ** 2))
+  const radius = Math.hypot(x - 12, z - 19)
+  return ridge - 4.4 * Math.exp(-((radius / 4.8) ** 2)) + 1.65 * Math.exp(-(((radius - 6.7) / 2.1) ** 2))
+}
+
+export function elevation(x: number, z: number, expedition = false) {
   const edge = T.MathUtils.smoothstep(Math.max(Math.abs(x), Math.abs(z)), 20, 45)
   let height = (Math.sin(x * .41) * Math.cos(z * .35) * .32 + Math.sin(x * .96 + z * .55) * .11) * (.18 + .82 * edge)
   for (const [cx, cz, size, depth] of craters) {
     const distance = Math.hypot(x - cx, z - cz) / size
     height += (Math.exp(-(distance ** 2) * 2) * -depth + Math.exp(-((distance - 1) ** 2) * 35) * depth * .44) * edge
+  }
+  if (expedition) {
+    let relief = expeditionRelief(x, z)
+    for (const pad of expeditionFoundations) {
+      const distance = Math.hypot(x - pad.x, z - pad.z)
+      if (distance < pad.radius + 1.5) {
+        relief = T.MathUtils.lerp(expeditionRelief(pad.x, pad.z), relief, T.MathUtils.smoothstep(distance, pad.radius, pad.radius + 1.5))
+      }
+    }
+    height += relief
   }
   return height
 }
@@ -58,9 +74,10 @@ function track(scene: T.Scene, a: { x: number; z: number }, b: { x: number; z: n
   surface.add(strip)
 }
 
-export function terrain(scene: T.Scene) {
+export function terrain(scene: T.Scene, expedition = false) {
   const random = randomSeed(806)
-  const base = new T.PlaneGeometry(178, 178, 128, 128)
+  const detail = expedition ? 224 : 128
+  const base = new T.PlaneGeometry(178, 178, detail, detail)
   base.rotateX(-Math.PI / 2)
   const vertices = base.getAttribute('position')
   const colors: number[] = []
@@ -68,7 +85,7 @@ export function terrain(scene: T.Scene) {
   for (let i = 0; i < vertices.count; i++) {
     const x = vertices.getX(i)
     const z = vertices.getZ(i)
-    const y = elevation(x, z)
+    const y = elevation(x, z, expedition)
     vertices.setY(i, y)
     tint.set('#747887').multiplyScalar(.77 + random() * .35 + .075 * Math.sin(x * .36 + z * .83))
     colors.push(tint.r, tint.g, tint.b)
@@ -77,8 +94,8 @@ export function terrain(scene: T.Scene) {
   base.computeVertexNormals()
   const surface = mesh(scene, base, new T.MeshStandardMaterial({ vertexColors: true, color: '#d4d5eb', map: mineralTexture(), roughness: 1 }), 0, 0, 0)
   surface.castShadow = false
-  track(scene, spawn, { x: 0, z: 1 })
-  for (const id of ['power', 'garden', 'air', 'rover', 'shelter', 'radio', 'lander'] as const) {
+  if (!expedition) track(scene, spawn, { x: 0, z: 1 })
+  if (!expedition) for (const id of ['power', 'garden', 'air', 'rover', 'shelter', 'radio', 'lander'] as const) {
     const site = sites[id]
     const hub = id === 'lander' || id === 'rover' ? spawn : { x: 0, z: -1 }
     track(scene, hub, site)
@@ -91,7 +108,7 @@ export function terrain(scene: T.Scene) {
     const x = Math.cos(angle) * distance
     const z = Math.sin(angle) * distance
     const size = .22 + random() ** 3 * 2.35
-    dummy.position.set(x, elevation(x, z) + size * .17, z)
+    dummy.position.set(x, elevation(x, z, expedition) + size * .17, z)
     dummy.rotation.set(random(), random() * 7, random())
     dummy.scale.set(size, size * (.44 + random() * .6), size * (.49 + random()))
     dummy.updateMatrix()

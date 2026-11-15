@@ -1,6 +1,6 @@
 # Original artwork
 
-Generated with the built-in OpenAI ImageGen tool. The game uses compressed copies of these four images.
+Generated with the built-in OpenAI ImageGen tool. The game uses compressed copies of these images.
 
 ## src/art/outpost.jpg
 

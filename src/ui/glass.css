@@ -1,0 +1,77 @@
+.app-shell .topbar { background: #0a1119bd; backdrop-filter: blur(24px) saturate(135%); }
+.app-shell .glass-panel { background: linear-gradient(145deg,#d7ecff25,transparent 60%),#141b24bc; border-color: #c6d9ea38; box-shadow: inset 0 1px #fff5, inset 0 -1px #bbd8f61c, 0 16px 40px #0005; }
+.app-shell .primary, .app-shell .secondary, .app-shell .icon-button, .decision-card, .module-marker {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  transition: transform 380ms cubic-bezier(.18,1.65,.43,1), background-color 220ms, border-color 220ms, box-shadow 260ms;
+}
+.app-shell .primary { background: linear-gradient(135deg,#fff,#e6f4ff 52%,#b7d7ed); color: #101c27; }
+.app-shell .secondary,.app-shell .icon-button {
+  background: linear-gradient(140deg,#d5edff4a,#9ac3e408 70%),#17223086;
+  backdrop-filter: blur(18px) saturate(148%);
+  border-color: #d4e8fb60;
+  box-shadow: inset 0 1px #fff6, inset 0 -1px #d2ecff38, 0 8px 24px #0004;
+}
+.app-shell :is(.primary,.secondary,.icon-button,.decision-card,.module-marker)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(9rem circle at var(--reflect-x,50%) var(--reflect-y,0%),#eaf8ff85,transparent 72%);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 250ms;
+}
+@media (hover:hover) {
+  .app-shell :is(.primary,.secondary,.icon-button,.decision-card,.module-marker):hover:not(:disabled) {
+    transform: translateY(-4px) scale(1.035);
+    box-shadow: inset 0 1px #fff9, 0 10px 35px #78c7ff42;
+    border-color: #cdeeff;
+  }
+  .app-shell .module-marker:hover:not(:disabled) { transform: translate(-50%,-50%) scale(1.08); }
+  .app-shell :is(.primary,.secondary,.icon-button,.decision-card,.module-marker):hover::after { opacity: 1; }
+}
+.app-shell :is(.primary,.secondary,.icon-button,.decision-card):active:not(:disabled) { transform: translateY(3px) scale(.91); transition-duration: 100ms; }
+.cursor-glass { position: fixed; inset: 0 auto auto 0; z-index: 8; pointer-events: none; width: 0; height: 0; opacity: 0; transition: opacity .25s; }
+.cursor-glass[data-visible="true"] { opacity: 1; }
+.cursor-glass i {
+  position: absolute; width: 5.75rem; aspect-ratio: 1; border-radius: 50%;
+  translate: -50% -50%; transform: scale(.7);
+  background: radial-gradient(circle,#b9dfff30,transparent 70%);
+  transition: transform .35s, box-shadow .35s;
+}
+.cursor-glass[data-interactive="true"] i { transform: scale(1); box-shadow: inset 0 0 1rem #98cefe28; }
+
+.app-shell .hero { background: radial-gradient(ellipse at 73% 54%,#233744 0, #0c141c 43%,#070a10 74%); }
+.app-shell .hero-art {
+  inset: 0 0 0 auto;
+  width: min(65%, 68rem);
+  height: 100%;
+  object-position: 51% 14%;
+  mask-image: linear-gradient(90deg,transparent,#000 27%),linear-gradient(0deg,transparent,#000 20%);
+  mask-composite: intersect;
+  animation: archive-drift 22s ease-in-out infinite alternate;
+}
+.app-shell .hero-scrim { background: linear-gradient(90deg,#080b12f2 10%,#080b127a 38%,transparent 64%), linear-gradient(0deg,#0a1018ed,transparent 24%); }
+.app-shell .hero h1 { font-family: "DM Sans", system-ui, sans-serif; font-size: clamp(4.7rem,9vw,8.35rem); letter-spacing: -.088em; line-height: .83; text-transform: none; }
+.app-shell .hero h1 span + span { color: #b9d5ec; -webkit-text-stroke: 0; letter-spacing: inherit; }
+.app-shell .hero-kicker { letter-spacing: .11em; text-transform: none; }
+.app-shell .hero-kicker span { animation: beacon-breathe 4s ease-in-out infinite; }
+.app-shell .hero-footer { border-color: #d3e7ff40; }
+.app-shell .hero-scrim::after { animation: sky-breathe 10s ease-in-out infinite alternate; }
+@keyframes archive-drift { from { transform: scale(1); } to { transform: scale(1.07) translateX(-1%); } }
+@keyframes beacon-breathe { 50% { transform: scale(1.55); box-shadow: 0 0 26px #bbecff; } }
+@keyframes sky-breathe { from { opacity: .4; } to { opacity: .92; } }
+@media (max-width:780px) and (orientation:portrait) {
+  .app-shell .hero-art { width: 100%; height: min(69%,36rem); object-position: 52% 35%; mask-image: linear-gradient(0deg,transparent,#000 34%); }
+  .app-shell .hero-scrim { background: linear-gradient(0deg,#080d15 28%,#080d155e 56%,transparent 75%); }
+  .app-shell .hero h1 { font-size: clamp(4.5rem,15vw,7.5rem); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .app-shell .hero-art,.app-shell .hero-kicker span,.app-shell .hero-scrim::after { animation: none; }
+  .app-shell :is(.primary,.secondary,.icon-button,.decision-card):is(:hover,:active) { transform: none; }
+  .cursor-glass { display: none; }
+}

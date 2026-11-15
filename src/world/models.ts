@@ -1,6 +1,6 @@
 import * as T from 'three'
 import type { CrewId } from '../mission'
-import { sites } from './layout'
+import { habitat, sectors, sites } from './layout'
 import type { SiteId } from './layout'
 
 export const metal = (color: T.ColorRepresentation, roughness = .55, metalness = .2) => new T.MeshStandardMaterial({ color, roughness, metalness })
@@ -174,24 +174,35 @@ function radioDish(group: T.Group) {
   return pivot
 }
 
-function landingPad(group: T.Group) {
-  disk(group, 4.15, .17, 0, 0)
-  const decal = mesh(group, new T.RingGeometry(2.59, 2.69, 42), amber, 0, .182, 0)
+function padSurface(group: T.Group, radius: number, color: string) {
+  disk(group, radius, .17, 0, 0)
+  const marking = light(color, .55)
+  const decal = mesh(group, new T.RingGeometry(2.52, 2.65, 42), marking, 0, .182, 0)
   decal.rotation.x = -Math.PI / 2
+  for (let i = 0; i < 4; i++) {
+    const angle = Math.PI / 4 + i * Math.PI / 2
+    box(group, .28, .17, .28, marking, Math.cos(angle) * (radius - .3), .24, Math.sin(angle) * (radius - .3))
+  }
+}
+
+function landingCraft(group: T.Object3D) {
+  const craft = new T.Group()
+  group.add(craft)
   for (let i = 0; i < 8; i++) {
     const angle = i * Math.PI / 4
     const x = Math.cos(angle) * 2.04
     const z = Math.sin(angle) * 2.04
-    pipe(group, new T.Vector3(x * .53, 1.45, z * .53), new T.Vector3(x, .32, z), .066, gray)
-    if (i % 2 === 0) cylinder(group, .23, .31, .18, brass, x, .28, z, 8)
+    pipe(craft, new T.Vector3(x * .53, 1.45, z * .53), new T.Vector3(x, .32, z), .066, gray)
+    if (i % 2 === 0) cylinder(craft, .23, .31, .18, brass, x, .28, z, 8)
   }
-  cylinder(group, 1.12, 1.28, .62, brass, 0, 1.06, 0, 8)
-  cylinder(group, .79, 1.18, 1.68, white, 0, 2.18, 0, 8)
-  cylinder(group, .26, .8, .64, navy, 0, 3.33, 0, 8)
-  box(group, .91, .37, .06, glass, 0, 2.42, .996)
-  box(group, .55, .055, .067, aqua, 0, 2.32, 1.012)
-  cylinder(group, .07, .055, .56, white, 0, 3.93, 0)
-  sphere(group, .085, red, 0, 4.25, 0)
+  cylinder(craft, 1.12, 1.28, .62, brass, 0, 1.06, 0, 8)
+  cylinder(craft, .79, 1.18, 1.68, white, 0, 2.18, 0, 8)
+  cylinder(craft, .26, .8, .64, navy, 0, 3.33, 0, 8)
+  box(craft, .91, .37, .06, glass, 0, 2.42, .996)
+  box(craft, .55, .055, .067, aqua, 0, 2.32, 1.012)
+  cylinder(craft, .07, .055, .56, white, 0, 3.93, 0)
+  sphere(craft, .085, red, 0, 4.25, 0)
+  return craft
 }
 
 export function roverModel() {
@@ -234,7 +245,7 @@ function crate(parent: T.Object3D, scale = 1) {
   return group
 }
 
-export function outpost(scene: T.Scene) {
+export function outpost(scene: T.Scene, expedition = false) {
   const yard = building(-12.3, -.5, scene)
   disk(yard, 3.05, .07, 0, 0)
   for (const x of [-2.03, 1.12]) for (const z of [-1.36, 1.14]) panel(yard, x, z, -.49)
@@ -244,10 +255,14 @@ export function outpost(scene: T.Scene) {
   box(power, .88, .08, .64, navy, -1.12, .67, -.7)
   const gardens = greenhouse(building(10, -4, scene))
   consoleAt(building(sites.garden.x, sites.garden.z, scene), '#76ffc3')
-  const shelter = shelterShell(building(-11, -15, scene))
-  consoleAt(building(sites.shelter.x, sites.shelter.z, scene), '#bfa8ff')
-  const dish = radioDish(building(10, -18.7, scene))
-  consoleAt(building(sites.radio.x, sites.radio.z, scene), '#78d5ff')
+  const shelterModule = building(-11, -15, scene)
+  const shelter = shelterShell(shelterModule)
+  const shelterConsole = building(sites.shelter.x, sites.shelter.z, scene)
+  consoleAt(shelterConsole, '#bfa8ff')
+  const relayModule = building(10, -18.7, scene)
+  const dish = radioDish(relayModule)
+  const relayConsole = building(sites.radio.x, sites.radio.z, scene)
+  consoleAt(relayConsole, '#78d5ff')
   const air = building(-1, -10.7, scene)
   disk(air, 2.65, .15, 0, 0)
   for (const x of [-1.18, 0, 1.18]) {
@@ -258,7 +273,32 @@ export function outpost(scene: T.Scene) {
   }
   box(air, 3.65, .17, .17, brass, 0, .38, 1.23)
   consoleAt(building(sites.air.x, sites.air.z, scene), '#82dcff')
-  landingPad(building(-18.5, 16.6, scene))
+  let craft: T.Group
+  const pads = expedition ? Object.entries(sectors).map(([id, site]) => {
+    const pad = building(site.x, site.z, scene)
+    padSurface(pad, 3.2, site.color)
+    return { id, pad }
+  }) : []
+  if (expedition) {
+    craft = landingCraft(scene)
+    const crewHabitat = building(habitat.x, habitat.z, scene)
+    disk(crewHabitat, 2.6, .16, 0, 0)
+    box(crewHabitat, 4.15, 1.78, 2.7, white, 0, 1.04)
+    box(crewHabitat, 4.28, .22, 2.84, navy, 0, 2)
+    box(crewHabitat, 2.7, .42, .07, glass, -.17, 1.42, 1.38)
+    box(crewHabitat, 2.7, .09, .08, aqua, -.17, 1.15, 1.39)
+    box(crewHabitat, .9, 1.36, .3, navy, 1.29, .83, 1.48)
+    box(crewHabitat, .6, .07, .04, aqua, 1.29, 1.49, 1.65)
+    for (const x of [-1.65, 1.65]) {
+      box(crewHabitat, .28, .15, 2.44, brass, x, 2.16, 0)
+    }
+  } else {
+    const pad = building(-18.5, 16.6, scene)
+    disk(pad, 4.15, .17, 0, 0)
+    const decal = mesh(pad, new T.RingGeometry(2.59, 2.69, 42), amber, 0, .182, 0)
+    decal.rotation.x = -Math.PI / 2
+    craft = landingCraft(pad)
+  }
   const { rover, wheels } = roverModel()
   scene.add(rover)
   rover.position.set(sites.rover.x + .6, 0, sites.rover.z - .7)
@@ -281,7 +321,8 @@ export function outpost(scene: T.Scene) {
     dot.castShadow = false
     beacons[id] = marker
   }
-  return { ...gardens, powerScreen, ...shelter, dish, rover, wheels, kit, roverCargo, beacons }
+  return { ...gardens, powerScreen, ...shelter, dish, rover, wheels, kit, roverCargo, beacons,
+    craft, pads, consoles: [power, shelterConsole, relayConsole] as const, modules: [yard, shelterModule, relayModule] as const }
 }
 
 export function astronaut(color: string, npc?: CrewId) {

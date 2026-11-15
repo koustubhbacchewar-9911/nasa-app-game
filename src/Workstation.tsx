@@ -3,6 +3,7 @@ import type { CSSProperties, DragEvent } from 'react'
 import { airCost, frames, limits, solarPower, step, turns } from './mission'
 import type { Mission, Plan } from './mission'
 import type { WorkVisual } from './world/runtime'
+import { Icon } from './ui/Icon'
 import './stations.css'
 
 type StationProps = { mission: Mission; onMove: (move: WorkVisual) => void; onCommit: (plan: Plan) => void }
@@ -15,8 +16,12 @@ function Projection({ mission, plan }: { mission: Mission; plan: Plan }) {
   const shade = firstLight < 0 ? following.length : firstLight
   const airTurns = Math.floor(next.power / airCost)
   return <div className="station-projection" aria-live="polite">
-    <span>After this job</span>
-    <strong>{next.power} battery · {next.air} backup air · {next.garden} crop steps</strong>
+    <span className="eyebrow">After this job</span>
+    <div className="projected-resources">
+      <span className="amber"><strong>{next.power}</strong> Battery</span>
+      <span className="blue"><strong>{next.air}</strong> Backup air</span>
+      <span className="mint"><strong>{next.garden}</strong> Crop steps</span>
+    </div>
     {shade > 0 && <small>{shade} turns of shadow ahead. Stored power covers {airTurns} {airTurns === 1 ? 'turn' : 'turns'} of air.</small>}
     {mission.turn === 2 || mission.turn === 3 ? <small>Exposure after work: {next.exposure} training points.</small> : null}
     {log && !log.applied && <small className="station-warning">The extra equipment needs more power. The crew will use its backup plan.</small>}
@@ -50,7 +55,7 @@ function PowerStation({ mission, onMove, onCommit }: StationProps) {
       <div><span>Air machine</span><strong>{input >= airCost ? '4 reserved' : 'On backup air'}</strong></div>
       <div><span>Battery after routing</span><strong>{Math.min(limits.power, Math.max(0, spare - cost))}</strong></div>
       <button draggable className="station-button energy-cell" onDragStart={(event) => event.dataTransfer.setData('application/x-power-cell', 'energy')}
-        onClick={() => changeLight(light + 1)} aria-label="Send one energy cell to the greenhouse">ϟ +1 power</button>
+        onClick={() => changeLight(light + 1)} aria-label="Add 1 power to the greenhouse"><Icon name="bolt" size={17} />Add 1 power</button>
     </div>
     <div className="power-load" onDragOver={(event) => event.preventDefault()} onDrop={(event) => drop(event, 'application/x-power-cell', () => changeLight(light + 1))}>
       <label htmlFor="light-load">Greenhouse dimmer <strong>{light} / {max}</strong></label>
@@ -61,13 +66,13 @@ function PowerStation({ mission, onMove, onCommit }: StationProps) {
     {last && <button className="station-button refill-air" aria-pressed={fill} onClick={() => {
       setFill(!fill)
       onMove({ target: !fill ? 'air' : light ? 'garden' : 'power', working: false })
-    }}>{fill ? '✓ ' : ''}Connect air tanks · 3 power</button>}
+    }}><Icon name={fill ? 'check' : 'air'} size={18} />Connect air tanks · 3 power</button>}
     {cost > spare && <p className="station-warning" role="status">Over budget by {cost - spare}. {last ? 'Dim the grow lights or disconnect the tanks.' : 'Dim the grow lights to stay within budget.'}</p>}
     <Projection mission={mission} plan={plan} />
     <button className="primary" disabled={cost > spare} onClick={() => {
       onMove({ target: fill ? 'air' : light ? 'garden' : 'power', light, working: true })
       onCommit(plan)
-    }}>Apply power schedule</button>
+    }}>Apply power schedule <Icon name="arrow" size={18} /></button>
   </div>
 }
 
@@ -123,14 +128,14 @@ function RouteStation({ mission, onMove, onCommit }: StationProps) {
         }} onClick={() => visit(id)}>{node.label}</button>)}
     </div>
     <div className="route-cost"><span>{power} battery</span><span>+{exposure} exposure</span><span>{kit ? 'Kit on route' : 'Kit stays outside'}</span></div>
-    <p className="station-hint" aria-live="polite">{hint || (done ? 'Route ready. Watch Pip drive it in the outpost.' : 'Tap or drag across the marked stops. Tap an earlier stop to undo.')}</p>
+    <p className="station-hint" aria-live="polite">{hint || (done ? 'Route ready. Check the cost before sending Pip to shelter.' : 'Tap or drag across the marked stops. Tap an earlier stop to undo.')}</p>
     {done && <Projection mission={mission} plan={plan} />}
     {done && overBudget && <p className="station-warning">There’s too little battery for this route. Try the main trail without the kit.</p>}
     <div className="station-actions">
       <button className="primary" disabled={!done || overBudget} onClick={() => {
         onMove({ target: 'shelter', working: true })
         onCommit(plan)
-      }}>Drive the route</button>
+      }}>Drive the route <Icon name="arrow" size={18} /></button>
       <button className="text-button" onClick={() => { setRoute(['start']); setHint('') }}>Clear route</button>
     </div>
   </div>
@@ -151,21 +156,20 @@ function ShelterStation({ mission, onMove, onCommit }: StationProps) {
   return <div className="workstation">
     <div className="station-heading"><h2>Shield the crew from the storm</h2><p>Drag water pods to cover the two gaps, or tap each gap. Every pod blocks one exposure point and uses 2 power.</p></div>
     <div className="shield-board">
-      <div className="particle-front" aria-hidden="true">↓ ↓ ↓ ↓ ↓ ↓</div>
+      <div className="particle-front" aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <Icon name="down" size={18} key={index} />)}</div>
       <div className="shield-gaps">{slots.map((covered, index) => <button className="station-button shield-gap" key={index} aria-pressed={covered}
-        aria-label={(covered ? 'Remove pod from' : 'Cover') + ' gap ' + (index + 1)}
-        onClick={() => setPod(index, !covered)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => drop(event, 'application/x-water-pod', () => setPod(index, true))}>{covered ? '▥ Water pod' : 'Open gap'}</button>)}</div>
-      <div className="shield-crew"><span aria-hidden="true">◎ ◎ ◎</span> Crew shelter</div>
+        onClick={() => setPod(index, !covered)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => drop(event, 'application/x-water-pod', () => setPod(index, true))}>{covered && <Icon name="water" size={17} />}Cover gap {index + 1}</button>)}</div>
+      <div className="shield-crew"><Icon name="crew" size={23} />Crew shelter</div>
       <button className="station-button pod-supply" draggable disabled={pods === 2}
         onDragStart={(event) => event.dataTransfer.setData('application/x-water-pod', 'water')}
-        onClick={() => setPod(slots.indexOf(false), true)}>▥ Load water pod · {2 - pods} left</button>
+        onClick={() => setPod(slots.indexOf(false), true)}><Icon name="water" size={17} />Load water pod · {2 - pods} left</button>
     </div>
     <Projection mission={mission} plan={plan} />
     {!enoughPower && <p className="station-warning" role="status">The lift cannot raise {pods} pods with the power left. Tap a placed pod to remove it.</p>}
     <button className="primary" disabled={!enoughPower} onClick={() => {
       onMove({ target: 'shelter', working: true, pods })
       onCommit(plan)
-    }}>{pods ? 'Raise ' + pods + (pods === 1 ? ' pod' : ' pods') : 'Seal the existing shelter'}</button>
+    }}>{pods ? 'Raise ' + pods + (pods === 1 ? ' pod' : ' pods') : 'Seal the existing shelter'} <Icon name="arrow" size={18} /></button>
   </div>
 }
 
@@ -180,7 +184,8 @@ function RadioStation({ mission, onMove, onCommit }: StationProps) {
   const [hint, setHint] = useState('')
   const signal = Math.max(0, 100 - Math.abs(earthBearing - bearing) * 3)
   const locked = signal >= 88
-  const canSend = mission.kit || mission.power >= airCost + 1
+  const airPowered = mission.power >= airCost
+  const canSend = mission.kit || mission.power > airCost
 
   function tune(value: number) {
     const angle = Math.max(0, Math.min(value, 100))
@@ -200,7 +205,7 @@ function RadioStation({ mission, onMove, onCommit }: StationProps) {
 
   return <div className="workstation">
     <div className="station-heading"><h2>Send Earth a useful distress call</h2><p>Aim the dish, then build the message in the order Mission Control reads it.</p></div>
-    <div className="radio-dial" aria-hidden="true"><span className="radio-dish" style={{ '--dish-turn': bearing - 90 + 'deg' } as CSSProperties}>◒</span>
+    <div className="radio-dial" aria-hidden="true"><span className="radio-dish" style={{ '--dish-turn': bearing - 72 + 'deg' } as CSSProperties}><Icon name="radio" size={31} /></span>
       <div className="signal-bars">{[20, 40, 60, 80, 90].map((level) => <i key={level} className={signal >= level ? 'signal-lit' : ''} style={{ height: level / 2 + 'px' }} />)}</div></div>
     <label className="tuner-label" htmlFor="antenna-tuner">Antenna angle <strong>{bearing}°</strong></label>
     <input className="antenna-tuner" id="antenna-tuner" type="range" min={0} max={100} value={bearing} onChange={(event) => tune(Number(event.target.value))} />
@@ -211,10 +216,10 @@ function RadioStation({ mission, onMove, onCommit }: StationProps) {
     <div className="packet-chips">{(['power', 'shelter', 'air'] as const).map((channel) => <button key={channel} className="station-button" draggable
       disabled={channels.includes(channel)} onDragStart={(event) => event.dataTransfer.setData('application/x-radio-channel', channel)} onClick={() => add(channel)}>{channelNames[channel]}</button>)}</div>
     {hint && <p className="station-warning" role="status">{hint}</p>}
-    <p className="station-hint">{mission.kit ? 'Pip’s spare cell can power this call.' : canSend ? 'The main battery can power this call.' : 'The radio cannot share the main battery right now. You can act locally with the backup air reserve.'}</p>
+    <p className="station-hint">{mission.kit ? 'Pip’s spare cell can power this call.' : canSend ? 'The main battery can power this call.' : airPowered ? 'The air machine needs the remaining battery. You can repair locally.' : 'The battery is too low to run the air machine or radio. Use backup air to get through this turn.'}</p>
     <div className="station-actions">
-      <button className="primary" disabled={!locked || channels.length !== packet.length || !canSend} onClick={() => onCommit(0)}>Send to Earth</button>
-      <button className="secondary" onClick={() => onCommit(1)}>Repair locally · 2 air</button>
+      <button className="primary" disabled={!locked || channels.length !== packet.length || !canSend} onClick={() => onCommit(0)}>Send to Earth <Icon name="arrow" size={18} /></button>
+      <button className="secondary" onClick={() => onCommit(1)}>{airPowered ? 'Repair locally · 2 air' : 'Use backup air this turn'}</button>
     </div>
   </div>
 }
